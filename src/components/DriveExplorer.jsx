@@ -32,6 +32,7 @@ export default function DriveExplorer({
   getFolderRecursiveDeckIds,
   getCardsByDeckIds,
 }) {
+  const [openMenuFolderId, setOpenMenuFolderId] = useState(null);
   const [openMenuDeckId, setOpenMenuDeckId] = useState(null);
 
   const scopeDeckIds = getFolderRecursiveDeckIds(currentFolderId);
@@ -239,40 +240,84 @@ export default function DriveExplorer({
               const st = computeStatsForCards(cards, progressMap);
               const subFolderCount = appData.folders.filter((sf) => sf.parentId === folder.id).length;
 
+              const isFolderMenuOpen = openMenuFolderId === folder.id;
+
               return (
                 <div
                   key={folder.id}
                   onClick={() => setCurrentFolderId(folder.id)}
-                  className="glass-card rounded-2xl p-3.5 flex flex-col justify-between gap-2.5 cursor-pointer shadow-sm hover:border-sky-300 transition"
+                  className="glass-card rounded-2xl p-3.5 flex flex-col justify-between gap-2.5 cursor-pointer shadow-sm hover:border-sky-300 transition relative"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
                       <div className="w-10 h-10 rounded-2xl bg-white/80 border border-slate-200/60 shadow-sm flex items-center justify-center text-xl shrink-0">
                         {folder.icon || '📁'}
                       </div>
-                      <div className="min-w-0">
-                        <h3 className="font-bold text-slate-800 text-sm truncate">{folder.name}</h3>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-bold text-slate-800 text-sm line-clamp-2 leading-snug break-words">{folder.name}</h3>
                         <p className="text-[11px] text-slate-500 mt-0.5">
                           {subFolderCount > 0 ? `${subFolderCount} mục con • ` : ''}
                           {deckIds.length} bài • {st.total} thẻ
                         </p>
                       </div>
                     </div>
-                    {isAdmin && (
+
+                    {/* Folder 3-dot Action Menu */}
+                    <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (window.confirm(`Xác nhận xóa thư mục "${folder.name}"?`)) {
-                            onDeleteFolder(folder.id);
-                          }
+                          setOpenMenuFolderId(isFolderMenuOpen ? null : folder.id);
                         }}
-                        className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg transition"
-                        title="Xóa thư mục"
+                        className="glass-pill w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 transition active:scale-95"
+                        title="Tùy chọn thư mục"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <MoreVertical className="w-4 h-4" />
                       </button>
-                    )}
+
+                      {isFolderMenuOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-40"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuFolderId(null);
+                            }}
+                          />
+                          <div className="absolute right-0 top-full mt-1.5 w-48 glass-panel bg-white/95 rounded-2xl p-1.5 z-50 shadow-xl border border-white/90 space-y-0.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuFolderId(null);
+                                onShareLink(`#folder=${folder.id}`, `Đã sao chép link chia sẻ thư mục "${folder.name}"!`);
+                              }}
+                              className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
+                            >
+                              <Share2 className="w-3.5 h-3.5 text-sky-600" />
+                              <span>Sao chép link thư mục</span>
+                            </button>
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenMenuFolderId(null);
+                                  if (window.confirm(`Xác nhận xóa thư mục "${folder.name}" cùng các bài học bên trong?`)) {
+                                    onDeleteFolder(folder.id);
+                                  }
+                                }}
+                                className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center gap-2"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                <span>Xóa thư mục này</span>
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <div className="w-full h-1.5 rounded-full bg-slate-200/80 overflow-hidden flex">
@@ -324,7 +369,7 @@ export default function DriveExplorer({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <BookOpen className="w-4 h-4 text-sky-600 shrink-0" />
-                        <h3 className="font-bold text-slate-800 text-sm sm:text-base truncate">{deck.name}</h3>
+                        <h3 className="font-bold text-slate-800 text-sm sm:text-base line-clamp-2 leading-snug break-words">{deck.name}</h3>
                       </div>
                       <p className="text-xs text-slate-500 mt-1">
                         {st.total} thẻ • <span className="text-rose-600 font-medium">{st.red} Đỏ</span> •{' '}
@@ -334,11 +379,14 @@ export default function DriveExplorer({
                     </div>
 
                     {/* Single 3-dot Action Menu button to prevent misclicks */}
-                    <div className="relative shrink-0">
+                    <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
-                        onClick={() => setOpenMenuDeckId(isMenuOpen ? null : deck.id)}
-                        className="glass-pill w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 transition"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuDeckId(isMenuOpen ? null : deck.id);
+                        }}
+                        className="glass-pill w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 transition active:scale-95"
                         title="Tùy chọn bài học"
                       >
                         <MoreVertical className="w-4 h-4" />
@@ -346,11 +394,18 @@ export default function DriveExplorer({
 
                       {isMenuOpen && (
                         <>
-                          <div className="fixed inset-0 z-40" onClick={() => setOpenMenuDeckId(null)} />
+                          <div
+                            className="fixed inset-0 z-40"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuDeckId(null);
+                            }}
+                          />
                           <div className="absolute right-0 top-full mt-1.5 w-48 glass-panel bg-white/95 rounded-2xl p-1.5 z-50 shadow-xl border border-white/90 space-y-0.5">
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setOpenMenuDeckId(null);
                                 onShareLink(`#deck=${deck.id}`, `Đã copy link chia sẻ bài "${deck.name}"`);
                               }}
@@ -362,7 +417,8 @@ export default function DriveExplorer({
                             {isAdmin && (
                               <button
                                 type="button"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setOpenMenuDeckId(null);
                                   if (window.confirm(`Xác nhận xóa bộ thẻ bài học "${deck.name}"?`)) {
                                     onDeleteDeck(deck.id);

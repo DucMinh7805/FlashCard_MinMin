@@ -11,6 +11,7 @@ import {
   X,
   Layers,
   Sparkles,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { computeStatsForCards, getCardProgress } from '../lib/spacedRepetition';
 
@@ -113,141 +114,68 @@ export default function StudyView({
 
   return (
     <section className="space-y-3 pb-28">
-      {/* Top Study Bar: 1 line, only lesson title, options menu */}
-      <div className="glass-panel rounded-2xl px-3.5 py-2 flex items-center justify-between gap-2 shadow-sm">
-        <button
-          type="button"
-          onClick={onExit}
-          className="glass-pill px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 flex items-center gap-1 transition"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Quay lại</span>
-        </button>
-
-        <h2 className="text-xs sm:text-sm font-bold text-slate-800 truncate max-w-[200px] sm:max-w-md text-center">
-          {session.title}
-        </h2>
-
-        <div className="flex items-center gap-1">
+      {/* Top Study Bar: 1 unified bar with counter, title, actions, and integrated 3px progress line */}
+      <div className="relative glass-panel rounded-2xl px-3 sm:px-4 py-2 shadow-sm border border-white/90 overflow-hidden">
+        <div className="flex items-center justify-between gap-2">
+          {/* Back button */}
           <button
             type="button"
-            disabled={undoCount === 0}
-            onClick={onUndo}
-            className="glass-pill w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 disabled:opacity-30 transition"
-            title="Hoàn tác thẻ vừa chấm (Z)"
+            onClick={onExit}
+            className="glass-pill px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 flex items-center gap-1 transition shrink-0 active:scale-95"
+            title="Quay lại danh sách bài học"
           >
-            <Undo2 className="w-3.5 h-3.5" />
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Quay lại</span>
           </button>
 
-          {/* More Options Dropdown */}
-          <div className="relative">
+          {/* Centered Title & Card Counter */}
+          <div className="flex items-center gap-2 min-w-0 justify-center">
+            <h2 className="text-xs sm:text-sm font-bold text-slate-800 truncate max-w-[140px] sm:max-w-xs text-center">
+              {session.title}
+            </h2>
+            <span className="px-2 py-0.5 rounded-full bg-slate-100/90 text-slate-700 font-bold text-[11px] shrink-0 border border-slate-200/60">
+              {isComplete
+                ? `${session.queue.length} / ${session.queue.length}`
+                : `${session.currentIndex + 1} / ${session.queue.length}`}
+            </span>
+            <div className="hidden md:flex items-center gap-2 text-[11px] font-medium text-slate-500 border-l border-slate-200 pl-2">
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" /> {st.red}
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" /> {st.yellow}
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> {st.green}
+              </span>
+            </div>
+          </div>
+
+          {/* Right actions: Undo + iOS Action Sheet Trigger (⋯) */}
+          <div className="flex items-center gap-1 shrink-0">
             <button
               type="button"
-              onClick={() => setOptionsOpen((v) => !v)}
-              className={`glass-pill w-8 h-8 rounded-xl flex items-center justify-center transition ${
-                optionsOpen ? 'bg-sky-100 text-sky-700 border-sky-300' : 'text-slate-600 hover:text-slate-900'
-              }`}
+              disabled={undoCount === 0}
+              onClick={onUndo}
+              className="glass-pill w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 disabled:opacity-30 transition active:scale-95"
+              title="Hoàn tác thẻ vừa chấm (Z)"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setOptionsOpen(true)}
+              className="glass-pill w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 transition active:scale-95"
               title="Tùy chọn học & Lọc thẻ"
             >
               <MoreHorizontal className="w-4 h-4" />
             </button>
-
-            {optionsOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setOptionsOpen(false)} />
-                <div className="absolute right-0 top-full mt-2 w-64 glass-panel bg-white/95 rounded-2xl p-3 z-50 shadow-2xl border border-white/90 space-y-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                      Bộ lọc thẻ ôn tập
-                    </label>
-                    <select
-                      value={session.filterMode}
-                      onChange={(e) => {
-                        onChangeFilter(e.target.value);
-                        setOptionsOpen(false);
-                      }}
-                      className="w-full glass-input rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-800"
-                    >
-                      <option value="all">Tất cả thẻ bài học</option>
-                      <option value="due">Đến hạn & Chưa nhớ (Spaced)</option>
-                      <option value="red_yellow">Chỉ thẻ Đỏ & Vàng</option>
-                      <option value="chunk20">Chia chặng 20 thẻ</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                      Chiều lật thẻ
-                    </label>
-                    <select
-                      value={session.direction}
-                      onChange={(e) => {
-                        onChangeDirection(e.target.value);
-                        setOptionsOpen(false);
-                      }}
-                      className="w-full glass-input rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-800"
-                    >
-                      <option value="front_to_back">Thuận (Trước → Sau)</option>
-                      <option value="back_to_front">Ngược (Sau → Trước)</option>
-                      <option value="mixed">Trộn chiều ngẫu nhiên</option>
-                    </select>
-                  </div>
-
-                  <div className="pt-1 border-t border-slate-200/80 flex items-center justify-between gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onShuffle();
-                        setOptionsOpen(false);
-                      }}
-                      className="flex-1 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium flex items-center justify-center gap-1.5"
-                    >
-                      <Shuffle className="w-3.5 h-3.5 text-sky-600" />
-                      <span>Trộn ngẫu nhiên</span>
-                    </button>
-                    {!isComplete && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onEditCard();
-                          setOptionsOpen(false);
-                        }}
-                        className="py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium flex items-center justify-center gap-1"
-                        title="Sửa thẻ hiện tại"
-                      >
-                        <Edit3 className="w-3.5 h-3.5 text-amber-600" />
-                        <span>Sửa</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
           </div>
         </div>
-      </div>
 
-      {/* Progress Strip */}
-      <div className="glass-panel rounded-2xl px-3.5 py-2 space-y-1.5 shadow-sm">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-bold text-slate-700">
-            {isComplete
-              ? `Hoàn tất ${session.queue.length} / ${session.queue.length} thẻ`
-              : `Thẻ ${session.currentIndex + 1} / ${session.queue.length}`}
-          </span>
-          <div className="flex items-center gap-2.5 text-[11px] font-medium text-slate-500">
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> {st.red}
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> {st.yellow}
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> {st.green}
-            </span>
-          </div>
-        </div>
-        <div className="w-full h-1.5 rounded-full bg-slate-200/80 overflow-hidden shadow-inner">
+        {/* 3px edge-to-edge Progress Bar attached to the bottom rim */}
+        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-slate-200/80 overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-sky-400 via-indigo-500 to-emerald-400 transition-all duration-300"
             style={{ width: `${pct}%` }}
@@ -442,6 +370,112 @@ export default function StudyView({
                 <span>Chạm thẻ hoặc bấm vào đây để lật đáp án</span>
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* iOS-STYLE ACTION SHEET (Mounted at root z-50 to completely prevent Stacking Context traps) */}
+      {optionsOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
+          {/* Backdrop click to dismiss */}
+          <div
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
+            onClick={() => setOptionsOpen(false)}
+          />
+
+          {/* Action Sheet Panel */}
+          <div className="relative w-full sm:max-w-md bg-white/95 backdrop-blur-2xl rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl border border-white/90 space-y-4 max-h-[85vh] overflow-y-auto z-10 transition-transform">
+            {/* Grab handle for mobile touch feel */}
+            <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto sm:hidden -mt-1 mb-2" />
+
+            <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-sky-600" />
+                <h3 className="text-sm font-bold text-slate-800">Tùy chọn học & Lọc thẻ</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOptionsOpen(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Filter Mode */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
+                Bộ lọc thẻ ôn tập
+              </label>
+              <select
+                value={session.filterMode}
+                onChange={(e) => {
+                  onChangeFilter(e.target.value);
+                  setOptionsOpen(false);
+                }}
+                className="w-full glass-input rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800"
+              >
+                <option value="all">Tất cả thẻ bài học ({allSessionCards.length} thẻ)</option>
+                <option value="due">Đến hạn & Chưa nhớ (Spaced Repetition)</option>
+                <option value="red_yellow">Chỉ thẻ Đỏ & Vàng (Chưa thuộc)</option>
+                <option value="chunk20">Chia chặng 20 thẻ một lần</option>
+              </select>
+            </div>
+
+            {/* Direction */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider">
+                Chiều lật thẻ
+              </label>
+              <select
+                value={session.direction}
+                onChange={(e) => {
+                  onChangeDirection(e.target.value);
+                  setOptionsOpen(false);
+                }}
+                className="w-full glass-input rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-slate-800"
+              >
+                <option value="front_to_back">Thuận (Trước → Sau)</option>
+                <option value="back_to_front">Ngược (Sau → Trước)</option>
+                <option value="mixed">Trộn chiều ngẫu nhiên</option>
+              </select>
+            </div>
+
+            {/* Actions: Shuffle & Quick Edit */}
+            <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onShuffle();
+                  setOptionsOpen(false);
+                }}
+                className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition"
+              >
+                <Shuffle className="w-3.5 h-3.5 text-sky-600" />
+                <span>Trộn ngẫu nhiên</span>
+              </button>
+              {!isComplete && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onEditCard();
+                    setOptionsOpen(false);
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Sửa thẻ này</span>
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setOptionsOpen(false)}
+              className="w-full py-2.5 rounded-xl bg-slate-900 text-white font-semibold text-xs sm:text-sm mt-1 active:scale-95 transition"
+            >
+              Xong
+            </button>
           </div>
         </div>
       )}

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, Plus, Settings, Sparkles, FolderPlus, BookPlus, Play, X, TrendingUp, Brain } from 'lucide-react';
 import { DEFAULT_DECKS, DEFAULT_FOLDERS } from './data/seedData';
 import { calculateNextProgress, getCardProgress, isCardDue } from './lib/spacedRepetition';
-import { DEFAULT_SUPABASE_KEY, DEFAULT_SUPABASE_URL, pullCloudData, pushCloudData } from './lib/supabase';
+import { DEFAULT_SUPABASE_KEY, DEFAULT_SUPABASE_URL, normalizeCurriculumData, pullCloudData, pushCloudData } from './lib/supabase';
 import DriveExplorer from './components/DriveExplorer';
 import StudyView from './components/StudyView';
 import ImportModal from './components/ImportModal';
@@ -54,35 +54,9 @@ export default function App() {
   const [appData, setAppData] = useState(() => {
     const saved = safeGet(STORAGE_KEY_CONTENT, null);
     if (saved?.folders && saved?.decks) {
-      // Migrate old hierarchy (fld_ykhoa as parent) to pragmatic clinical root folders
-      const hasOldYkhoa = saved.folders.some((f) => f.id === 'fld_ykhoa');
-      if (hasOldYkhoa) {
-        let updatedFolders = saved.folders
-          .filter((f) => f.id !== 'fld_ykhoa')
-          .map((f) => {
-            if (f.parentId === 'fld_ykhoa') return { ...f, parentId: null };
-            if (f.id === 'fld_avcn' && (f.icon === '🇬🇧' || !f.icon)) return { ...f, icon: '🌐' };
-            return f;
-          });
-        if (!updatedFolders.some((f) => f.id === 'fld_yhcs')) {
-          const insertIdx = updatedFolders.findIndex((f) => f.id === 'fld_avcn');
-          const yhcsFolder = {
-            id: 'fld_yhcs',
-            name: 'Y học cơ sở (Giải phẫu, Sinh lý, Dược lý...)',
-            icon: '🧬',
-            parentId: null,
-          };
-          if (insertIdx >= 0) {
-            updatedFolders.splice(insertIdx, 0, yhcsFolder);
-          } else {
-            updatedFolders.push(yhcsFolder);
-          }
-        }
-        const migrated = { ...saved, folders: updatedFolders };
-        safeSet(STORAGE_KEY_CONTENT, migrated);
-        return migrated;
-      }
-      return saved;
+      const normalized = normalizeCurriculumData(saved);
+      safeSet(STORAGE_KEY_CONTENT, normalized);
+      return normalized;
     }
     const initial = { folders: DEFAULT_FOLDERS, decks: DEFAULT_DECKS };
     safeSet(STORAGE_KEY_CONTENT, initial);
@@ -209,12 +183,17 @@ export default function App() {
     // 2. Fetch latest data from Cloud and re-check deep link
     (async () => {
       if (!settings.supabaseUrl || !settings.supabaseKey) return;
-      const cloud = await pullCloudData(settings.supabaseUrl, settings.supabaseKey);
-      if (cloud) {
+      const rawCloud = await pullCloudData(settings.supabaseUrl, settings.supabaseKey);
+      if (rawCloud) {
+        const cloud = normalizeCurriculumData(rawCloud);
         setAppData(cloud);
         safeSet(STORAGE_KEY_CONTENT, cloud);
         // If not already in a session, resolve deep-link from fresh cloud data
         resolveHash(cloud);
+        // If Cloud still had the old hierarchy, auto-push the normalized version to Cloud immediately
+        if (settings.isAdmin && rawCloud.folders?.some((f) => f.id === 'fld_ykhoa')) {
+          pushCloudData(settings.supabaseUrl, settings.supabaseKey, cloud);
+        }
       } else if (settings.isAdmin) {
         await pushCloudData(settings.supabaseUrl, settings.supabaseKey, appData);
       }
@@ -868,8 +847,9 @@ export default function App() {
           showToast(res.ok ? '☁ Đã đẩy toàn bộ cây thư mục & thẻ lên Cloud!' : 'Lỗi đồng bộ lên Supabase.');
         }}
         onPullCloud={async () => {
-          const cloud = await pullCloudData(settings.supabaseUrl, settings.supabaseKey);
-          if (cloud) {
+          const rawCloud = await pullCloudData(settings.supabaseUrl, settings.supabaseKey);
+          if (rawCloud) {
+            const cloud = normalizeCurriculumData(rawCloud);
             setAppData(cloud);
             safeSet(STORAGE_KEY_CONTENT, cloud);
             showToast('⬇ Đã đồng bộ kho thẻ mới nhất từ Cloud!');

@@ -165,6 +165,37 @@ export async function pushCloudData(url, key, appData) {
   }
 }
 
+export function normalizeCurriculumData(data) {
+  if (!data?.folders) return data;
+  const hasOldYkhoa = data.folders.some((f) => f.id === 'fld_ykhoa');
+  if (!hasOldYkhoa) return data;
+
+  let updatedFolders = data.folders
+    .filter((f) => f.id !== 'fld_ykhoa')
+    .map((f) => {
+      if (f.parentId === 'fld_ykhoa') return { ...f, parentId: null };
+      if (f.id === 'fld_avcn' && (f.icon === '🇬🇧' || !f.icon)) return { ...f, icon: '🌐' };
+      return f;
+    });
+
+  if (!updatedFolders.some((f) => f.id === 'fld_yhcs')) {
+    const insertIdx = updatedFolders.findIndex((f) => f.id === 'fld_avcn');
+    const yhcsFolder = {
+      id: 'fld_yhcs',
+      name: 'Y học cơ sở (Giải phẫu, Sinh lý, Dược lý...)',
+      icon: '🧬',
+      parentId: null,
+    };
+    if (insertIdx >= 0) {
+      updatedFolders.splice(insertIdx, 0, yhcsFolder);
+    } else {
+      updatedFolders.push(yhcsFolder);
+    }
+  }
+
+  return { ...data, folders: updatedFolders };
+}
+
 export async function pullCloudData(url, key) {
   if (!url || !key) return null;
   const base = url.replace(/\/$/, '');
@@ -192,7 +223,7 @@ export async function pullCloudData(url, key) {
             image: c.image || '',
           });
         }
-        return {
+        return normalizeCurriculumData({
           folders: folders.map((f) => ({
             id: f.id,
             name: f.name,
@@ -206,7 +237,7 @@ export async function pullCloudData(url, key) {
             updatedAt: d.updated_at || '',
             cards: cardsByDeck[d.id] || [],
           })),
-        };
+        });
       }
     }
   } catch {
@@ -220,7 +251,7 @@ export async function pullCloudData(url, key) {
     if (!res.ok) return null;
     const data = await res.json();
     if (Array.isArray(data) && data[0] && data[0].payload && Array.isArray(data[0].payload.folders)) {
-      return data[0].payload;
+      return normalizeCurriculumData(data[0].payload);
     }
     return null;
   } catch {

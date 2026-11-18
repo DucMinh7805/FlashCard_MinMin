@@ -227,7 +227,7 @@ export default function StudyView({
                     ? 'Mặt trước • Đã điền khuyết'
                     : 'Mặt trước • Điền vào chỗ trống [...]'
                   : card.type === 'case'
-                    ? 'Mặt trước • Tình huống lâm sàng (Case Study)'
+                    ? 'Mặt trước • Tình huống lâm sàng (Case)'
                     : useReverse
                       ? 'Chiều ngược • Đáp án → Đoán thuật ngữ'
                       : 'Mặt trước • Thuật ngữ / Câu hỏi'}

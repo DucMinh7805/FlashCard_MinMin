@@ -3,10 +3,16 @@ import { X, Copy, Check, Sparkles } from 'lucide-react';
 
 const STANDARD_PROMPT = `Hãy chuyển đổi tài liệu bài học dưới đây thành bộ Flashcard chuẩn JSON để nạp vào ứng dụng FlashCard MinMin.
 
+Nguyên tắc bắt buộc:
+- Chỉ lấy kiến thức có trong tài liệu đính kèm, tuyệt đối không tự bịa thêm liều thuốc hay tiêu chuẩn ngoài tài liệu.
+- Tập trung sâu vào: [ghi rõ trọng tâm bạn muốn học, ví dụ: tiêu chuẩn chẩn đoán, liều thuốc cấp cứu, chẩn đoán phân biệt / hoặc: toàn bộ từ vựng in đậm].
+- Tạo khoảng [20-35] thẻ, tự động chia hợp lý: Basic cho định nghĩa/từ vựng, Cloze {{c1::...}} cho mốc số/tam chứng/tiêu chuẩn, Case cho tình huống xử trí.
+- Tóm tắt 5 gạch đầu dòng quan trọng nhất để điền vào trường "note".
+
 Yêu cầu cấu trúc JSON chính xác:
 {
   "deck": "Tên bài học (Ví dụ: Bài 1 - X-ray & CT lồng ngực)",
-  "note": "Tóm tắt trọng tâm / Ghi chú lâm sàng nhanh của bài học (tùy chọn, để '' nếu không có)",
+  "note": "Tóm tắt 5 gạch đầu dòng trọng tâm lâm sàng nhanh của bài học",
   "cards": [
     {
       "type": "basic | cloze | case",
@@ -48,7 +54,7 @@ export default function PromptModal({ isOpen, onClose, onCopySuccess }) {
             <div>
               <h3 className="text-base sm:text-lg font-bold text-slate-800">Prompt AI tạo Flashcard Đa Môn</h3>
               <p className="text-xs text-slate-500">
-                Tự động chọn loại thẻ: Định nghĩa (Basic), Điền khuyết (Cloze) và Ca lâm sàng (Case)
+                Kèm 4 nguyên tắc khóa mục tiêu chuẩn Y khoa và phân loại Basic, Cloze, Case
               </p>
             </div>
           </div>

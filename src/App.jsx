@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Header from './components/Header';
 import ResumeBanner from './components/ResumeBanner';
+import BottomDock from './components/BottomDock';
 import DriveExplorer from './components/DriveExplorer';
 import StudyView from './components/StudyView';
 import AppModals from './components/AppModals';
@@ -334,7 +335,7 @@ export default function App() {
       )}
 
       {/* Main Container */}
-      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-4 pb-6 sm:pb-8">
+      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-4 pb-20 sm:pb-8">
         {/* Resume Banner */}
         {!activeSession && (
           <ResumeBanner
@@ -452,6 +453,24 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Floating Bottom Navigation Dock for Mobile (Option 1 Soft Floating Capsule) */}
+      {!activeSession && (
+        <BottomDock
+          currentFolderId={currentFolderId}
+          setCurrentFolderId={setCurrentFolderId}
+          showSearch={showSearch}
+          setShowSearch={setShowSearch}
+          analyticsOpen={analyticsOpen}
+          setAnalyticsOpen={setAnalyticsOpen}
+          settingsOpen={settingsOpen}
+          setSettingsOpen={setSettingsOpen}
+          appData={appData}
+          progressMap={progressMap}
+          onStartStudy={startStudySession}
+          showToast={showToast}
+        />
+      )}
 
       {/* Modals & Dialogs Component */}
       <AppModals

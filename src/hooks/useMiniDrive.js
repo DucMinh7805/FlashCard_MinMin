@@ -1,0 +1,435 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { DEFAULT_DECKS, DEFAULT_FOLDERS } from '../data/seedData';
+import {
+  DEFAULT_SUPABASE_KEY,
+  DEFAULT_SUPABASE_URL,
+  normalizeCurriculumData,
+  pullCloudData,
+  pushCloudData,
+  atomicUpsertFolder,
+  atomicDeleteFolder,
+  atomicUpsertDeckWithCards,
+  atomicUpdateDeckMeta,
+  atomicDeleteDeck,
+  atomicUpdateCard,
+} from '../lib/supabase';
+
+export const STORAGE_KEY_CONTENT = 'minmin_flashcard_drive_v1';
+export const STORAGE_KEY_PROGRESS = 'minmin_flashcard_progress_v1';
+export const STORAGE_KEY_SESSION = 'minmin_flashcard_active_session_v1';
+export const STORAGE_KEY_SETTINGS = 'minmin_flashcard_settings_v1';
+export const STORAGE_KEY_ACTIVITY = 'minmin_flashcard_activity_v1';
+
+export function safeGet(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function safeSet(key, val) {
+  try {
+    localStorage.setItem(key, JSON.stringify(val));
+  } catch {
+    // Ignore quota errors
+  }
+}
+
+export function getAllDescendantFolderIds(rootFolderId, allFolders) {
+  const ids = new Set([rootFolderId]);
+  let added = true;
+  while (added) {
+    added = false;
+    for (const f of allFolders) {
+      if (f.parentId && ids.has(f.parentId) && !ids.has(f.id)) {
+        ids.add(f.id);
+        added = true;
+      }
+    }
+  }
+  return ids;
+}
+
+export function useMiniDrive({ showToast, hasActiveSession }) {
+  const [appData, setAppData] = useState(() => {
+    const saved = safeGet(STORAGE_KEY_CONTENT, null);
+    if (saved?.folders && saved?.decks) {
+      const normalized = normalizeCurriculumData(saved);
+      safeSet(STORAGE_KEY_CONTENT, normalized);
+      return normalized;
+    }
+    const initial = { folders: DEFAULT_FOLDERS, decks: DEFAULT_DECKS };
+    safeSet(STORAGE_KEY_CONTENT, initial);
+    return initial;
+  });
+
+  const [progressMap, setProgressMap] = useState(() => safeGet(STORAGE_KEY_PROGRESS, {}));
+  const [activityLogs, setActivityLogs] = useState(() => safeGet(STORAGE_KEY_ACTIVITY, {}));
+  const [settings, setSettings] = useState(() => {
+    const saved = safeGet(STORAGE_KEY_SETTINGS, {});
+    return {
+      studentName: saved?.studentName || 'Học viên',
+      ...saved,
+      supabaseUrl: saved?.supabaseUrl || DEFAULT_SUPABASE_URL,
+      supabaseKey: saved?.supabaseKey || DEFAULT_SUPABASE_KEY,
+    };
+  });
+
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
+  const isSyncingRef = useRef(false);
+
+  // Background Cloud Sync (Silent and non-destructive)
+  const syncFromCloud = useCallback(
+    async (isSilent = true) => {
+      if (!settings.supabaseUrl || !settings.supabaseKey) return;
+      if (isSyncingRef.current) return;
+      isSyncingRef.current = true;
+      setIsCloudSyncing(true);
+      try {
+        const rawCloud = await pullCloudData(settings.supabaseUrl, settings.supabaseKey);
+        if (rawCloud) {
+          const cloud = normalizeCurriculumData(rawCloud);
+          setAppData(cloud);
+          safeSet(STORAGE_KEY_CONTENT, cloud);
+          if (!isSilent) showToast('⬇ Đã đồng bộ kho bài học mới nhất từ Cloud!');
+        }
+      } catch {
+        // Ignore background network issues
+      } finally {
+        isSyncingRef.current = false;
+        setTimeout(() => setIsCloudSyncing(false), 500);
+      }
+    },
+    [settings.supabaseUrl, settings.supabaseKey, showToast]
+  );
+
+  // Auto-sync: on startup, when returning to tab, and periodic background poll
+  useEffect(() => {
+    syncFromCloud(true);
+
+    const handleFocus = () => syncFromCloud(true);
+    const handleVisibility = () => {
+      if (!document.hidden) syncFromCloud(true);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    const interval = setInterval(() => {
+      if (!hasActiveSession) {
+        syncFromCloud(true);
+      }
+    }, 25000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(interval);
+    };
+  }, [syncFromCloud, hasActiveSession]);
+
+  // Folder & Deck Helpers
+  const getFolderPath = useCallback(
+    (folderId) => {
+      const path = [];
+      const visited = new Set();
+      let curr = appData.folders.find((f) => f.id === folderId);
+      while (curr && !visited.has(curr.id)) {
+        visited.add(curr.id);
+        path.unshift(curr);
+        curr = appData.folders.find((f) => f.id === curr.parentId);
+      }
+      return path;
+    },
+    [appData.folders]
+  );
+
+  const getFolderRecursiveDeckIds = useCallback(
+    (folderId) => {
+      const folderIds = new Set([folderId]);
+      let added = true;
+      while (added) {
+        added = false;
+        for (const f of appData.folders) {
+          if (f.parentId && folderIds.has(f.parentId) && !folderIds.has(f.id)) {
+            folderIds.add(f.id);
+            added = true;
+          }
+        }
+      }
+      return appData.decks.filter((d) => (folderId === null ? true : folderIds.has(d.folderId))).map((d) => d.id);
+    },
+    [appData]
+  );
+
+  const getCardsByDeckIds = useCallback(
+    (deckIds) => {
+      const set = new Set(deckIds);
+      const list = [];
+      for (const d of appData.decks) {
+        if (set.has(d.id)) {
+          for (const c of d.cards) {
+            list.push({ ...c, deckId: d.id, deckName: d.name });
+          }
+        }
+      }
+      return list;
+    },
+    [appData.decks]
+  );
+
+  // Atomic CRUD Handlers (Shared Mini Drive for ~10 users)
+  const handleCreateFolder = ({ name, icon, parentId }) => {
+    if (!name) return showToast('Vui lòng nhập tên thư mục!');
+    const newFolder = {
+      id: `fld_${Date.now()}`,
+      name,
+      icon: icon || '📁',
+      author: settings.studentName || 'Thành viên',
+      parentId: parentId ?? null,
+    };
+    const nextFolders = [...appData.folders, newFolder];
+    const nextData = { ...appData, folders: nextFolders };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+    atomicUpsertFolder(settings.supabaseUrl, settings.supabaseKey, newFolder);
+    showToast(`Đã tạo thư mục "${name}"`);
+  };
+
+  const handleEditFolder = (folderId, { name, icon }) => {
+    if (!name) return showToast('Vui lòng nhập tên thư mục!');
+    const folder = appData.folders.find((f) => f.id === folderId);
+    if (!folder) return;
+    const updated = { ...folder, name, icon: icon || '📁' };
+    const nextFolders = appData.folders.map((f) => (f.id === folderId ? updated : f));
+    const nextData = { ...appData, folders: nextFolders };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+    atomicUpsertFolder(settings.supabaseUrl, settings.supabaseKey, updated);
+    showToast(`Đã cập nhật thư mục "${name}"`);
+  };
+
+  const handleMoveFolder = (folderId, targetParentId) => {
+    const folder = appData.folders.find((f) => f.id === folderId);
+    if (!folder) return;
+    const updated = { ...folder, parentId: targetParentId || null };
+    const nextFolders = appData.folders.map((f) => (f.id === folderId ? updated : f));
+    const nextData = { ...appData, folders: nextFolders };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+    atomicUpsertFolder(settings.supabaseUrl, settings.supabaseKey, updated);
+    showToast(`Đã chuyển thư mục "${folder.name}"`);
+  };
+
+  const handleDeleteFolder = (folderId, currentFolderId, setCurrentFolderId) => {
+    const descendantFolderIds = getAllDescendantFolderIds(folderId, appData.folders);
+    const affectedDeckIds = appData.decks.filter((d) => descendantFolderIds.has(d.folderId)).map((d) => d.id);
+    const affectedCardIds = new Set();
+    for (const d of appData.decks) {
+      if (descendantFolderIds.has(d.folderId)) {
+        for (const c of d.cards) affectedCardIds.add(c.id);
+      }
+    }
+
+    for (const fid of descendantFolderIds) {
+      atomicDeleteFolder(settings.supabaseUrl, settings.supabaseKey, fid);
+    }
+    for (const did of affectedDeckIds) {
+      atomicDeleteDeck(settings.supabaseUrl, settings.supabaseKey, did);
+    }
+
+    const nextFolders = appData.folders.filter((f) => !descendantFolderIds.has(f.id));
+    const nextDecks = appData.decks.filter((d) => !descendantFolderIds.has(d.folderId));
+    const nextData = { folders: nextFolders, decks: nextDecks };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+
+    if (affectedCardIds.size > 0) {
+      const nextProgressMap = { ...progressMap };
+      let changed = false;
+      for (const cid of affectedCardIds) {
+        if (nextProgressMap[cid]) {
+          delete nextProgressMap[cid];
+          changed = true;
+        }
+      }
+      if (changed) {
+        setProgressMap(nextProgressMap);
+        safeSet(STORAGE_KEY_PROGRESS, nextProgressMap);
+      }
+    }
+
+    if (currentFolderId && descendantFolderIds.has(currentFolderId)) {
+      const parent = appData.folders.find((f) => f.id === folderId)?.parentId || null;
+      setCurrentFolderId(parent);
+    }
+    showToast('Đã xóa thư mục và dữ liệu liên quan.');
+  };
+
+  const handleConfirmImport = ({ parsed, selectedFolderId, deckNameInput, deckNoteInput, currentFolderId, onComplete }) => {
+    if (parsed.cards.length === 0) return showToast('Chưa có thẻ hợp lệ để nạp!');
+
+    const targetFolderId = selectedFolderId !== undefined ? selectedFolderId : currentFolderId;
+    const deckName = deckNameInput || `Bài học mới ${new Date().toLocaleDateString('vi-VN')}`;
+    const author = settings.studentName || 'Thành viên';
+    const note = deckNoteInput !== undefined ? deckNoteInput : (parsed.note || '');
+
+    const nextDecks = appData.decks.map((d) => ({ ...d, cards: d.cards.slice() }));
+    const existing = nextDecks.find(
+      (d) => (d.folderId || null) === targetFolderId && d.name.toLowerCase() === deckName.toLowerCase()
+    );
+
+    let targetDeck;
+    if (existing) {
+      let added = 0;
+      let updated = 0;
+      for (const nc of parsed.cards) {
+        const match = existing.cards.find((c) => c.front.trim().toLowerCase() === nc.front.trim().toLowerCase());
+        if (match) {
+          Object.assign(match, { back: nc.back, hint: nc.hint || match.hint, extra: nc.extra || match.extra, type: nc.type || match.type });
+          updated++;
+        } else {
+          existing.cards.push(nc);
+          added++;
+        }
+      }
+      if (note) existing.note = note;
+      existing.author = author;
+      existing.updatedAt = new Date().toLocaleDateString('sv-SE');
+      targetDeck = existing;
+      showToast(`Đã gộp vào "${existing.name}": thêm ${added} thẻ, cập nhật ${updated} thẻ!`);
+    } else {
+      targetDeck = {
+        id: `deck_${Date.now()}`,
+        folderId: targetFolderId,
+        name: deckName,
+        note,
+        author,
+        updatedAt: new Date().toLocaleDateString('sv-SE'),
+        cards: parsed.cards,
+      };
+      nextDecks.push(targetDeck);
+      showToast(`Đã tạo bộ thẻ "${deckName}" (${parsed.cards.length} thẻ)!`);
+    }
+
+    const nextData = { folders: appData.folders, decks: nextDecks };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+
+    atomicUpsertDeckWithCards(settings.supabaseUrl, settings.supabaseKey, targetDeck, targetDeck.cards);
+
+    if (onComplete) onComplete(targetFolderId);
+  };
+
+  const handleEditDeck = ({ id, name, note }) => {
+    const deck = appData.decks.find((d) => d.id === id);
+    if (!deck) return;
+    const updated = {
+      ...deck,
+      name: name || deck.name,
+      note: note !== undefined ? note : deck.note,
+      updatedAt: new Date().toLocaleDateString('sv-SE'),
+    };
+    const nextDecks = appData.decks.map((d) => (d.id === id ? updated : d));
+    const nextData = { ...appData, decks: nextDecks };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+    atomicUpdateDeckMeta(settings.supabaseUrl, settings.supabaseKey, id, { name: updated.name, note: updated.note });
+    showToast(`Đã cập nhật bài học "${updated.name}"`);
+  };
+
+  const handleMoveDeck = (deckId, newFolderId) => {
+    const deck = appData.decks.find((d) => d.id === deckId);
+    if (!deck) return;
+    const updated = { ...deck, folderId: newFolderId || null, updatedAt: new Date().toLocaleDateString('sv-SE') };
+    const nextDecks = appData.decks.map((d) => (d.id === deckId ? updated : d));
+    const nextData = { ...appData, decks: nextDecks };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+    atomicUpdateDeckMeta(settings.supabaseUrl, settings.supabaseKey, deckId, { folderId: updated.folderId });
+    showToast(`Đã chuyển bài "${deck.name}" sang thư mục mới`);
+  };
+
+  const handleDeleteDeck = (deckId) => {
+    const deck = appData.decks.find((d) => d.id === deckId);
+    const cardIds = (deck?.cards || []).map((c) => c.id);
+
+    atomicDeleteDeck(settings.supabaseUrl, settings.supabaseKey, deckId);
+
+    const nextDecks = appData.decks.filter((d) => d.id !== deckId);
+    const nextData = { ...appData, decks: nextDecks };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+
+    if (cardIds.length > 0) {
+      const nextProgressMap = { ...progressMap };
+      let changed = false;
+      for (const cid of cardIds) {
+        if (nextProgressMap[cid]) {
+          delete nextProgressMap[cid];
+          changed = true;
+        }
+      }
+      if (changed) {
+        setProgressMap(nextProgressMap);
+        safeSet(STORAGE_KEY_PROGRESS, nextProgressMap);
+      }
+    }
+    showToast('Đã xóa bộ bài học.');
+  };
+
+  const handleSaveCard = (updatedCard) => {
+    const nextDecks = appData.decks.map((d) => ({
+      ...d,
+      cards: d.cards.map((c) => (c.id === updatedCard.id ? updatedCard : c)),
+    }));
+    const nextData = { ...appData, decks: nextDecks };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+
+    atomicUpdateCard(settings.supabaseUrl, settings.supabaseKey, updatedCard);
+    showToast('Đã cập nhật nội dung thẻ!');
+  };
+
+  const updateSettings = (patch) => {
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    safeSet(STORAGE_KEY_SETTINGS, next);
+  };
+
+  const resetProgress = () => {
+    setProgressMap({});
+    localStorage.removeItem(STORAGE_KEY_PROGRESS);
+    localStorage.removeItem(STORAGE_KEY_SESSION);
+    showToast('Đã đặt lại toàn bộ tiến độ về Chưa học.');
+  };
+
+  return {
+    appData,
+    setAppData,
+    progressMap,
+    setProgressMap,
+    activityLogs,
+    setActivityLogs,
+    settings,
+    setSettings,
+    updateSettings,
+    resetProgress,
+    isCloudSyncing,
+    syncFromCloud,
+    getFolderPath,
+    getFolderRecursiveDeckIds,
+    getCardsByDeckIds,
+    handleCreateFolder,
+    handleEditFolder,
+    handleMoveFolder,
+    handleDeleteFolder,
+    handleConfirmImport,
+    handleEditDeck,
+    handleMoveDeck,
+    handleDeleteDeck,
+    handleSaveCard,
+  };
+}

@@ -93,7 +93,7 @@ export default function ThesisDocsModal({ isOpen, onClose }) {
                 <h4 className="text-xs font-bold text-slate-800">Lấy Prompt AI tạo Flashcard</h4>
               </div>
               <p className="text-xs text-slate-600 pl-8 leading-relaxed">
-                Bấm nút <strong className="text-sky-700">+ Thêm → Prompt AI</strong>, sao chép prompt và dán kèm tài liệu bài giảng/slide vào ChatGPT hoặc Gemini. AI sẽ tự động xuất định dạng JSON kèm Ghi chú bài học.
+                Bấm nút <strong className="text-sky-700">+ Thêm <ArrowRight className="w-3.5 h-3.5 inline mx-0.5 text-sky-600" /> Prompt AI</strong>, sao chép prompt và dán kèm tài liệu bài giảng/slide vào ChatGPT hoặc Gemini. AI sẽ tự động xuất định dạng JSON kèm Ghi chú bài học.
               </p>
             </div>
 

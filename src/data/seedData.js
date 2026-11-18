@@ -60,6 +60,8 @@ export const DEFAULT_DECKS = [
     id: 'deck_xray_ct',
     folderId: 'fld_avcn_cdha',
     name: 'Bài 1: X-ray and CT (43 thẻ đầy đủ)',
+    author: 'Ban Học Tập Y Khoa',
+    note: 'Thuật ngữ tiếng Anh chuyên ngành Chẩn đoán hình ảnh: X-quang ngực quy ước, chụp cắt lớp vi tính (CT scanner), thuốc cản quang và các thủ thuật can thiệp lâm sàng.',
     updatedAt: '2026-11-18',
     cards: XRAY_CT_CARDS,
   },
@@ -67,6 +69,8 @@ export const DEFAULT_DECKS = [
     id: 'deck_noi_timmach',
     folderId: 'fld_noi',
     name: 'Bài 1: Cấp cứu Tăng huyết áp & Suy tim',
+    author: 'Ban Học Tập Y Khoa',
+    note: 'Tiêu chuẩn chẩn đoán Tăng huyết áp cấp cứu (Hypertensive Emergency) vs Khẩn trương (Urgency); Tiêu chuẩn Framingham trong chẩn đoán suy tim sung huyết.',
     updatedAt: '2026-11-18',
     cards: [
       {
@@ -91,6 +95,8 @@ export const DEFAULT_DECKS = [
     id: 'deck_ngoai_bung',
     folderId: 'fld_ngoai',
     name: 'Bài 1: Nhiễm trùng đường mật & Viêm ruột thừa',
+    author: 'Ban Học Tập Y Khoa',
+    note: 'Tam chứng Charcot và Ngũ chứng Reynolds trong nhiễm trùng đường mật cấp; Dấu hiệu viêm ruột thừa cấp.',
     updatedAt: '2026-11-18',
     cards: [
       {

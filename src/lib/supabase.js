@@ -11,33 +11,42 @@ export function buildSupabaseHeaders(key, extra = {}) {
 
 export function normalizeCurriculumData(data) {
   if (!data?.folders) return data;
+  let updatedFolders = data.folders;
   const hasOldYkhoa = data.folders.some((f) => f.id === 'fld_ykhoa');
-  if (!hasOldYkhoa) return data;
+  if (hasOldYkhoa) {
+    updatedFolders = data.folders
+      .filter((f) => f.id !== 'fld_ykhoa')
+      .map((f) => {
+        if (f.parentId === 'fld_ykhoa') return { ...f, parentId: null };
+        if (f.id === 'fld_avcn' && (f.icon === '🇬🇧' || !f.icon)) return { ...f, icon: '🌐' };
+        return f;
+      });
 
-  let updatedFolders = data.folders
-    .filter((f) => f.id !== 'fld_ykhoa')
-    .map((f) => {
-      if (f.parentId === 'fld_ykhoa') return { ...f, parentId: null };
-      if (f.id === 'fld_avcn' && (f.icon === '🇬🇧' || !f.icon)) return { ...f, icon: '🌐' };
-      return f;
-    });
-
-  if (!updatedFolders.some((f) => f.id === 'fld_yhcs')) {
-    const insertIdx = updatedFolders.findIndex((f) => f.id === 'fld_avcn');
-    const yhcsFolder = {
-      id: 'fld_yhcs',
-      name: 'Y học cơ sở (Giải phẫu, Sinh lý, Dược lý...)',
-      icon: '🧬',
-      parentId: null,
-    };
-    if (insertIdx >= 0) {
-      updatedFolders.splice(insertIdx, 0, yhcsFolder);
-    } else {
-      updatedFolders.push(yhcsFolder);
+    if (!updatedFolders.some((f) => f.id === 'fld_yhcs')) {
+      const insertIdx = updatedFolders.findIndex((f) => f.id === 'fld_avcn');
+      const yhcsFolder = {
+        id: 'fld_yhcs',
+        name: 'Y học cơ sở (Giải phẫu, Sinh lý, Dược lý...)',
+        icon: '🧬',
+        parentId: null,
+      };
+      if (insertIdx >= 0) {
+        updatedFolders.splice(insertIdx, 0, yhcsFolder);
+      } else {
+        updatedFolders.push(yhcsFolder);
+      }
     }
   }
 
-  return { ...data, folders: updatedFolders };
+  // Ensure default/old seed decks have a clean author
+  const updatedDecks = (data.decks || []).map((d) => {
+    if (!d.author || d.author.trim() === '') {
+      return { ...d, author: 'Ban Học Tập Y Khoa' };
+    }
+    return d;
+  });
+
+  return { ...data, folders: updatedFolders, decks: updatedDecks };
 }
 
 /**

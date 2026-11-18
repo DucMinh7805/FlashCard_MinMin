@@ -252,21 +252,27 @@ export default function AnalyticsModal({
 
                 {/* Progress bar */}
                 <div className="w-full h-2 rounded-full bg-slate-200/80 overflow-hidden flex shadow-inner">
-                  <div
-                    style={{ width: `${stats.total ? (stats.red / stats.total) * 100 : 0}%` }}
-                    className="bg-rose-500 h-full"
-                    title={`Chưa nhớ: ${stats.red}`}
-                  />
-                  <div
-                    style={{ width: `${stats.total ? (stats.yellow / stats.total) * 100 : 0}%` }}
-                    className="bg-amber-400 h-full"
-                    title={`Tạm hiểu: ${stats.yellow}`}
-                  />
-                  <div
-                    style={{ width: `${stats.total ? (stats.green / stats.total) * 100 : 0}%` }}
-                    className="bg-emerald-500 h-full"
-                    title={`Đã thuộc: ${stats.green}`}
-                  />
+                  {stats.total > 0 && stats.red > 0 && (
+                    <div
+                      style={{ width: `${(stats.red / stats.total) * 100}%` }}
+                      className="bg-rose-500 h-full shrink-0"
+                      title={`Chưa nhớ: ${stats.red}`}
+                    />
+                  )}
+                  {stats.total > 0 && stats.yellow > 0 && (
+                    <div
+                      style={{ width: `${(stats.yellow / stats.total) * 100}%` }}
+                      className="bg-amber-400 h-full shrink-0"
+                      title={`Tạm hiểu: ${stats.yellow}`}
+                    />
+                  )}
+                  {stats.total > 0 && stats.green > 0 && (
+                    <div
+                      style={{ width: `${(stats.green / stats.total) * 100}%` }}
+                      className="bg-emerald-500 h-full shrink-0"
+                      title={`Đã thuộc: ${stats.green}`}
+                    />
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] text-slate-500">

@@ -235,6 +235,26 @@ export default function ThesisDocsModal({ isOpen, onClose }) {
                 Nhờ phân tách này, 10 bạn trong nhóm học tập dù ôn tập đồng thời cũng không bao giờ làm xáo trộn kho thẻ master hoặc ghi đè kết quả của nhau.
               </p>
             </div>
+
+            <div className="glass-card rounded-2xl p-3.5 space-y-2 border-slate-200/80 bg-slate-50/60">
+              <p className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-amber-600" />
+                <span>4. Đánh giá An toàn & Lộ trình Mở rộng Đồ án (Security & Enterprise Roadmap)</span>
+              </p>
+              <div className="space-y-1.5 text-[11px] text-slate-600 leading-relaxed">
+                <p>
+                  <strong>• Thiết kế thực tế hiện tại (Client Gatekeeping):</strong> Sử dụng cơ chế PIN State Isolation trên trình duyệt để nhóm 10 học viên đạt trải nghiệm <em>Zero Friction</em> (vào học ngay lập tức trên iPhone/Android mà không bị ép tạo tài khoản rườm rà). Đổi mã PIN lưu cục bộ theo máy.
+                </p>
+                <p>
+                  <strong>• Lộ trình nâng cấp chuẩn Doanh nghiệp (Enterprise Upgrade Path):</strong>
+                </p>
+                <ul className="list-disc list-inside space-y-1 pl-1 text-slate-700">
+                  <li><strong>Supabase Auth:</strong> Tích hợp đăng nhập Google OAuth 2.0 / Email Magic Link để nhận diện định danh từng học viên trên Cloud.</li>
+                  <li><strong>PostgreSQL Row Level Security (RLS):</strong> Phân quyền cứng ở tầng Database — chỉ tài khoản Chủ sở hữu mới có quyền <code>INSERT/UPDATE/DELETE</code> kho bài học chung; 10 học viên chỉ có quyền <code>SELECT</code> bài học và quyền <code>ALL</code> trên tiến độ cá nhân của chính mình.</li>
+                  <li><strong>Edge Functions & Server-side Secrets:</strong> Lưu trữ Master Secret Key an toàn trong biến môi trường Backend, loại bỏ hoàn toàn việc lưu Key ở Frontend.</li>
+                </ul>
+              </div>
+            </div>
           </div>
         )}
 

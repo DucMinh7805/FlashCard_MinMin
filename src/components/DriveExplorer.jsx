@@ -203,9 +203,27 @@ export default function DriveExplorer({
 
         <div className="flex items-center gap-2 flex-1 sm:max-w-xs min-w-[130px]">
           <div className="flex-1 h-2 rounded-full bg-slate-200/80 overflow-hidden flex shadow-inner">
-            <div style={{ width: `${redPct}%` }} className="bg-rose-500 h-full transition-all" title={`Chưa nhớ: ${scopeStats.red}`} />
-            <div style={{ width: `${yellowPct}%` }} className="bg-amber-400 h-full transition-all" title={`Tạm hiểu: ${scopeStats.yellow}`} />
-            <div style={{ width: `${greenBarPct}%` }} className="bg-emerald-500 h-full transition-all" title={`Đã thuộc: ${scopeStats.green}`} />
+            {scopeStats.total > 0 && scopeStats.red > 0 && (
+              <div
+                style={{ width: `${(scopeStats.red / scopeStats.total) * 100}%` }}
+                className="bg-rose-500 h-full shrink-0"
+                title={`Chưa nhớ: ${scopeStats.red}`}
+              />
+            )}
+            {scopeStats.total > 0 && scopeStats.yellow > 0 && (
+              <div
+                style={{ width: `${(scopeStats.yellow / scopeStats.total) * 100}%` }}
+                className="bg-amber-400 h-full shrink-0"
+                title={`Tạm hiểu: ${scopeStats.yellow}`}
+              />
+            )}
+            {scopeStats.total > 0 && scopeStats.green > 0 && (
+              <div
+                style={{ width: `${(scopeStats.green / scopeStats.total) * 100}%` }}
+                className="bg-emerald-500 h-full shrink-0"
+                title={`Đã thuộc: ${scopeStats.green}`}
+              />
+            )}
           </div>
           <span className="text-[11px] font-bold text-emerald-700 whitespace-nowrap">
             {greenPct}% Đã nhớ
@@ -348,10 +366,28 @@ export default function DriveExplorer({
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <div className="w-full h-1.5 rounded-full bg-slate-200/80 overflow-hidden flex">
-                      <div className="bg-rose-500 h-full" style={{ width: `${st.total ? (st.red / st.total) * 100 : 0}%` }} />
-                      <div className="bg-amber-400 h-full" style={{ width: `${st.total ? (st.yellow / st.total) * 100 : 0}%` }} />
-                      <div className="bg-emerald-500 h-full" style={{ width: `${st.total ? (st.green / st.total) * 100 : 0}%` }} />
+                    <div className="w-full h-1.5 rounded-full bg-slate-200/80 overflow-hidden flex shadow-inner">
+                      {st.total > 0 && st.red > 0 && (
+                        <div
+                          className="bg-rose-500 h-full shrink-0"
+                          style={{ width: `${(st.red / st.total) * 100}%` }}
+                          title={`Chưa nhớ: ${st.red}`}
+                        />
+                      )}
+                      {st.total > 0 && st.yellow > 0 && (
+                        <div
+                          className="bg-amber-400 h-full shrink-0"
+                          style={{ width: `${(st.yellow / st.total) * 100}%` }}
+                          title={`Tạm hiểu: ${st.yellow}`}
+                        />
+                      )}
+                      {st.total > 0 && st.green > 0 && (
+                        <div
+                          className="bg-emerald-500 h-full shrink-0"
+                          style={{ width: `${(st.green / st.total) * 100}%` }}
+                          title={`Đã thuộc: ${st.green}`}
+                        />
+                      )}
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-slate-500">
                       <span>
@@ -483,9 +519,27 @@ export default function DriveExplorer({
 
                   {/* Progress bar */}
                   <div className="w-full h-1.5 rounded-full bg-slate-200/80 overflow-hidden flex shadow-inner">
-                    <div className="bg-rose-500 h-full" style={{ width: `${st.total ? (st.red / st.total) * 100 : 0}%` }} />
-                    <div className="bg-amber-400 h-full" style={{ width: `${st.total ? (st.yellow / st.total) * 100 : 0}%` }} />
-                    <div className="bg-emerald-500 h-full" style={{ width: `${st.total ? (st.green / st.total) * 100 : 0}%` }} />
+                    {st.total > 0 && st.red > 0 && (
+                      <div
+                        className="bg-rose-500 h-full shrink-0"
+                        style={{ width: `${(st.red / st.total) * 100}%` }}
+                        title={`Chưa nhớ: ${st.red}`}
+                      />
+                    )}
+                    {st.total > 0 && st.yellow > 0 && (
+                      <div
+                        className="bg-amber-400 h-full shrink-0"
+                        style={{ width: `${(st.yellow / st.total) * 100}%` }}
+                        title={`Tạm hiểu: ${st.yellow}`}
+                      />
+                    )}
+                    {st.total > 0 && st.green > 0 && (
+                      <div
+                        className="bg-emerald-500 h-full shrink-0"
+                        style={{ width: `${(st.green / st.total) * 100}%` }}
+                        title={`Đã thuộc: ${st.green}`}
+                      />
+                    )}
                   </div>
 
                   {/* Bottom Action buttons */}

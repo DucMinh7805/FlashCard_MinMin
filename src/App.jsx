@@ -279,7 +279,13 @@ export default function App() {
 
     setUndoStack((prev) => [
       ...prev,
-      { cardId: card.id, prevProg, prevIndex: activeSession.currentIndex, queueLengthBefore: queue.length },
+      {
+        cardId: card.id,
+        prevProg,
+        prevIndex: activeSession.currentIndex,
+        prevQueue: activeSession.queue.slice(),
+        prevReviewedCount: activeSession.reviewedCount,
+      },
     ]);
 
     if (rating === 'red' && (!card.__repCount || card.__repCount < 2)) {
@@ -323,20 +329,31 @@ export default function App() {
     const last = undoStack[undoStack.length - 1];
     setUndoStack((prev) => prev.slice(0, -1));
 
+    // 1. Revert card progress in progressMap
     const nextProgressMap = { ...progressMap, [last.cardId]: last.prevProg };
     setProgressMap(nextProgressMap);
     safeSet(STORAGE_KEY_PROGRESS, nextProgressMap);
 
-    const trimmedQueue = activeSession.queue.slice(0, last.queueLengthBefore);
+    // 2. Decrement today's activity review count
+    const todayKey = new Date().toISOString().slice(0, 10);
+    if (activityLogs[todayKey] && activityLogs[todayKey] > 0) {
+      const nextActivity = { ...activityLogs, [todayKey]: Math.max(0, activityLogs[todayKey] - 1) };
+      setActivityLogs(nextActivity);
+      safeSet(STORAGE_KEY_ACTIVITY, nextActivity);
+    }
+
+    // 3. Restore exact queue snapshot before rating (removes any spliced clones of Red/Yellow cards)
     const nextSession = {
       ...activeSession,
-      queue: trimmedQueue,
+      queue: last.prevQueue || activeSession.queue.slice(0, last.queueLengthBefore),
       currentIndex: last.prevIndex,
       isFlipped: true,
-      reviewedCount: Math.max(0, activeSession.reviewedCount - 1),
+      hintVisible: false,
+      reviewedCount: Math.max(0, last.prevReviewedCount ?? (activeSession.reviewedCount - 1)),
     };
     setActiveSession(nextSession);
     safeSet(STORAGE_KEY_SESSION, nextSession);
+    setResumeCandidate(nextSession);
     showToast('Đã hoàn tác thẻ vừa chấm.');
   };
 
@@ -726,8 +743,13 @@ export default function App() {
             cards: d.cards.map((c) => (c.id === target.id ? { ...c, ...updated } : c)),
           }));
           persistAndSyncContent({ ...appData, decks: nextDecks });
-          const nextQueue = activeSession.queue.map((c, idx) => (idx === activeSession.currentIndex ? { ...c, ...updated } : c));
-          setActiveSession({ ...activeSession, queue: nextQueue });
+          // Update ALL instances of this card in queue (including any repetition clones)
+          const nextQueue = activeSession.queue.map((c) =>
+            c.id === target.id ? { ...c, ...updated } : c
+          );
+          const nextSession = { ...activeSession, queue: nextQueue };
+          setActiveSession(nextSession);
+          safeSet(STORAGE_KEY_SESSION, nextSession);
           setEditorMode(null);
           setEditingCard(null);
           showToast('Đã cập nhật nội dung thẻ!');

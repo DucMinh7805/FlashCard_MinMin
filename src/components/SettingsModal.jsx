@@ -151,6 +151,9 @@ export default function SettingsModal({
                   Lưu PIN mới
                 </button>
               </div>
+              <p className="text-[10px] text-slate-400 italic pt-0.5">
+                Mã PIN mới được lưu trên trình duyệt máy này. (Xem mục 🧠 Kiến trúc đồ án để tham khảo lộ trình nâng cấp Supabase Auth & RLS).
+              </p>
             </div>
           )}
         </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   Lock,
@@ -34,6 +34,26 @@ export default function SettingsModal({
   const [studentName, setStudentName] = useState(settings.studentName || 'Học viên');
   const [supabaseUrl, setSupabaseUrl] = useState(settings.supabaseUrl || '');
   const [supabaseKey, setSupabaseKey] = useState(settings.supabaseKey || '');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  const handleUnlock = (e) => {
+    if (e) e.preventDefault();
+    if (pinInput.trim() === String(settings.pin).trim()) {
+      onUpdateSettings({ isAdmin: true });
+      setPinInput('');
+      showToast('Đã mở khóa quyền Chủ sở hữu!');
+    } else {
+      showToast('Mã PIN không đúng. Vui lòng kiểm tra lại.');
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -85,31 +105,25 @@ export default function SettingsModal({
           </div>
 
           {!settings.isAdmin ? (
-            <div className="flex items-center gap-2 pt-1">
+            <form onSubmit={handleUnlock} className="flex items-center gap-2 pt-1">
               <input
                 type="password"
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleUnlock(e);
+                }}
                 placeholder="Nhập mã PIN Chủ sở hữu để mở khóa"
                 className="flex-1 glass-input rounded-xl px-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400"
               />
               <button
-                type="button"
-                onClick={() => {
-                  if (pinInput.trim() === settings.pin) {
-                    onUpdateSettings({ isAdmin: true });
-                    setPinInput('');
-                    showToast('Đã mở khóa quyền Chủ sở hữu!');
-                  } else {
-                    showToast('Mã PIN không đúng. Vui lòng kiểm tra lại.');
-                  }
-                }}
-                className="px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs shadow-sm transition shrink-0 flex items-center gap-1"
+                type="submit"
+                className="px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs shadow-sm transition shrink-0 flex items-center gap-1 active:scale-95 cursor-pointer"
               >
                 <Unlock className="w-3.5 h-3.5" />
                 <span>Mở khóa</span>
               </button>
-            </div>
+            </form>
           ) : (
             <div className="pt-1 border-t border-slate-200/60 space-y-1.5">
               <p className="text-[11px] font-semibold text-slate-600 flex items-center gap-1">

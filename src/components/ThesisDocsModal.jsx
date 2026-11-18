@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   BookOpen,
@@ -12,10 +12,20 @@ import {
   Database,
   Lock,
   GitBranch,
+  ArrowRight,
 } from 'lucide-react';
 
 export default function ThesisDocsModal({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('algorithm'); // 'algorithm' | 'architecture' | 'ai_data'
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -47,12 +57,12 @@ export default function ThesisDocsModal({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-2xl">
+        {/* Tab Switcher - Instant zero-latency toggle */}
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
           <button
             type="button"
             onClick={() => setActiveTab('algorithm')}
-            className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-none flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'algorithm'
                 ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
@@ -64,7 +74,7 @@ export default function ThesisDocsModal({ isOpen, onClose }) {
           <button
             type="button"
             onClick={() => setActiveTab('architecture')}
-            className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-none flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'architecture'
                 ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
@@ -76,7 +86,7 @@ export default function ThesisDocsModal({ isOpen, onClose }) {
           <button
             type="button"
             onClick={() => setActiveTab('ai_data')}
-            className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold transition-none flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'ai_data'
                 ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
@@ -89,7 +99,7 @@ export default function ThesisDocsModal({ isOpen, onClose }) {
 
         {/* Tab 1: Spaced Repetition Algorithm */}
         {activeTab === 'algorithm' && (
-          <div className="space-y-3.5 text-xs text-slate-700 leading-relaxed animate-fadeIn">
+          <div className="space-y-3.5 text-xs text-slate-700 leading-relaxed">
             <div className="glass-card rounded-2xl p-3.5 bg-indigo-50/50 border-indigo-200/80 space-y-1.5">
               <p className="font-bold text-indigo-900 text-sm flex items-center gap-1.5">
                 <Brain className="w-4 h-4 text-indigo-600" />
@@ -131,7 +141,7 @@ export default function ThesisDocsModal({ isOpen, onClose }) {
                       <td className="py-2 pr-2 font-bold text-emerald-600">🟢 Đã thuộc (3)</td>
                       <td className="py-2 px-2">Vượt qua phiên hiện tại</td>
                       <td className="py-2 px-2">Tăng +1 Hộp (tối đa Hộp 4)</td>
-                      <td className="py-2 pl-2">Giãn cách: 3d → 5d → 9d → 14d → 21d</td>
+                      <td className="py-2 pl-2">Giãn cách: 3d &rarr; 5d &rarr; 9d &rarr; 14d &rarr; 21d</td>
                     </tr>
                   </tbody>
                 </table>
@@ -154,7 +164,7 @@ export default function ThesisDocsModal({ isOpen, onClose }) {
 
         {/* Tab 2: System Architecture & Security */}
         {activeTab === 'architecture' && (
-          <div className="space-y-3.5 text-xs text-slate-700 leading-relaxed animate-fadeIn">
+          <div className="space-y-3.5 text-xs text-slate-700 leading-relaxed">
             <div className="glass-card rounded-2xl p-3.5 bg-sky-50/50 border-sky-200/80 space-y-1.5">
               <p className="font-bold text-sky-900 text-sm flex items-center gap-1.5">
                 <Server className="w-4 h-4 text-sky-600" />
@@ -209,9 +219,17 @@ export default function ThesisDocsModal({ isOpen, onClose }) {
               <p>
                 Dữ liệu ứng dụng được phân tách rạch ròi thành 2 miền:
               </p>
-              <div className="p-2.5 rounded-xl bg-slate-100 font-mono text-[11px] text-slate-800 space-y-1">
-                <p>1. <strong>Master Content</strong> (Folders + Decks + Cards) ➔ Quản lý tập trung bởi Admin.</p>
-                <p>2. <strong>User Progress</strong> (Card Progress Map + Activity Logs) ➔ Quản lý phân tán độc lập trên máy từng học viên.</p>
+              <div className="p-2.5 rounded-xl bg-slate-100 font-mono text-[11px] text-slate-800 space-y-1.5">
+                <p className="flex items-center gap-1.5">
+                  <span>1. <strong>Master Content</strong> (Thư mục + Bộ thẻ)</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-sky-600 shrink-0 inline" />
+                  <span>Quản lý tập trung bởi Admin.</span>
+                </p>
+                <p className="flex items-center gap-1.5">
+                  <span>2. <strong>User Progress</strong> (Tiến độ + Logs)</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-sky-600 shrink-0 inline" />
+                  <span>Quản lý phân tán độc lập trên máy từng học viên.</span>
+                </p>
               </div>
               <p className="text-[11px] text-slate-500">
                 Nhờ phân tách này, 10 bạn trong nhóm học tập dù ôn tập đồng thời cũng không bao giờ làm xáo trộn kho thẻ master hoặc ghi đè kết quả của nhau.
@@ -222,7 +240,7 @@ export default function ThesisDocsModal({ isOpen, onClose }) {
 
         {/* Tab 3: Data Standard & AI Prompt */}
         {activeTab === 'ai_data' && (
-          <div className="space-y-3.5 text-xs text-slate-700 leading-relaxed animate-fadeIn">
+          <div className="space-y-3.5 text-xs text-slate-700 leading-relaxed">
             <div className="glass-card rounded-2xl p-3.5 bg-amber-50/50 border-amber-200/80 space-y-1.5">
               <p className="font-bold text-amber-900 text-sm flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-amber-600" />
@@ -238,7 +256,7 @@ export default function ThesisDocsModal({ isOpen, onClose }) {
                 <div className="p-2.5 rounded-xl bg-white/90 border border-amber-200/60">
                   <span className="font-bold text-emerald-800 text-xs">② Điền khuyết (Cloze Deletion):</span>
                   <p className="text-[11px] text-slate-600 mt-0.5">
-                    Dùng regex <code>\{`{\\{c1::từ khóa\\}\\}`}</code> để ẩn từ khóa quan trọng trong câu dài (mốc liều lượng, tam chứng, giải phẫu). Khi chưa lật hiện <code>[ ... ]</code>, khi lật sẽ highlight từ khóa.
+                    Dùng cú pháp <code>{`{{c1::từ khóa}}`}</code> để ẩn từ khóa quan trọng trong câu dài (mốc liều lượng, tam chứng, giải phẫu). Khi chưa lật hiện <code>[ ... ]</code>, khi lật sẽ highlight từ khóa.
                   </p>
                 </div>
                 <div className="p-2.5 rounded-xl bg-white/90 border border-amber-200/60">

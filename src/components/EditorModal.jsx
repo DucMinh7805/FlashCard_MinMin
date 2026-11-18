@@ -5,12 +5,21 @@ export default function EditorModal({ mode, card, onClose, onSaveFolder, onSaveC
   const [folderName, setFolderName] = useState('');
   const [folderIcon, setFolderIcon] = useState('📁');
 
-  const [type, setType] = useState('basic');
-  const [front, setFront] = useState('');
-  const [back, setBack] = useState('');
-  const [hint, setHint] = useState('');
-  const [image, setImage] = useState('');
-  const [extra, setExtra] = useState('');
+  const [type, setType] = useState(card?.type || 'basic');
+  const [front, setFront] = useState(card?.front || '');
+  const [back, setBack] = useState(card?.back || '');
+  const [hint, setHint] = useState(card?.hint || '');
+  const [image, setImage] = useState(card?.image || '');
+  const [extra, setExtra] = useState(card?.extra || '');
+
+  useEffect(() => {
+    if (!mode) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mode, onClose]);
 
   useEffect(() => {
     if (mode === 'new_folder') {
@@ -24,7 +33,7 @@ export default function EditorModal({ mode, card, onClose, onSaveFolder, onSaveC
       setImage(card.image || '');
       setExtra(card.extra || '');
     }
-  }, [mode, card]);
+  }, [mode, card, card?.id, card?.front, card?.back]);
 
   if (!mode) return null;
 

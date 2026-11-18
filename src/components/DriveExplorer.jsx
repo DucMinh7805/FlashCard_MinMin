@@ -270,7 +270,9 @@ export default function DriveExplorer({
                 <div
                   key={folder.id}
                   onClick={() => setCurrentFolderId(folder.id)}
-                  className="glass-card rounded-2xl p-3.5 flex flex-col justify-between gap-2.5 cursor-pointer shadow-sm hover:border-sky-300 transition relative"
+                  className={`glass-card rounded-2xl p-3.5 flex flex-col justify-between gap-2.5 cursor-pointer shadow-sm hover:border-sky-300 transition ${
+                    isFolderMenuOpen ? 'relative z-40' : 'relative z-10'
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -311,7 +313,7 @@ export default function DriveExplorer({
                               setOpenMenuFolderId(null);
                             }}
                           />
-                          <div className="absolute right-0 top-full mt-1.5 w-52 bg-white/98 backdrop-blur-2xl rounded-2xl p-1.5 z-50 shadow-2xl border border-slate-200/90 space-y-0.5">
+                          <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-2xl p-1.5 z-50 shadow-2xl border border-slate-200 space-y-0.5">
                             <button
                               type="button"
                               onClick={(e) => {
@@ -402,7 +404,12 @@ export default function DriveExplorer({
               const isMenuOpen = openMenuDeckId === deck.id;
 
               return (
-                <div key={deck.id} className="glass-card rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between gap-3 shadow-sm hover:border-sky-300 transition">
+                <div
+                  key={deck.id}
+                  className={`glass-card rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between gap-3 shadow-sm hover:border-sky-300 transition ${
+                    isMenuOpen ? 'relative z-40' : 'relative z-10'
+                  }`}
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -439,7 +446,7 @@ export default function DriveExplorer({
                               setOpenMenuDeckId(null);
                             }}
                           />
-                          <div className="absolute right-0 top-full mt-1.5 w-52 bg-white/98 backdrop-blur-2xl rounded-2xl p-1.5 z-50 shadow-2xl border border-slate-200/90 space-y-0.5">
+                          <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-2xl p-1.5 z-50 shadow-2xl border border-slate-200 space-y-0.5">
                             <button
                               type="button"
                               onClick={(e) => {

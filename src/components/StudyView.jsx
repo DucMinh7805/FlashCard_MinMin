@@ -484,7 +484,7 @@ export default function StudyView({
                     e.preventDefault();
                     e.stopPropagation();
                     setOptionsOpen(false);
-                    onEditCard();
+                    onEditCard(card);
                   }}
                   className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition"
                 >

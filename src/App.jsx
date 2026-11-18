@@ -75,6 +75,7 @@ export default function App() {
   const [thesisDocsOpen, setThesisDocsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editorMode, setEditorMode] = useState(null);
+  const [editingCard, setEditingCard] = useState(null);
   const [toastMsg, setToastMsg] = useState('');
 
   const showToast = useCallback((msg) => {
@@ -406,7 +407,7 @@ export default function App() {
 
       {/* Top Navigation - Streamlined 1-row header, hidden during Study Session */}
       {!activeSession && (
-        <header className="sticky top-0 z-30 px-3 sm:px-4 pt-2.5 pb-2">
+        <header className={`sticky top-0 px-3 sm:px-4 pt-2.5 pb-2 transition-all ${plusMenuOpen ? 'z-50' : 'z-30'}`}>
           <div className="max-w-5xl mx-auto glass-panel rounded-2xl px-3 sm:px-4 py-2 flex items-center justify-between gap-2 shadow-sm">
             {/* Logo & App Title */}
             <button
@@ -440,7 +441,7 @@ export default function App() {
               </div>
             </button>
 
-            {/* Right Actions: Analytics + Thesis Docs + Search + Plus Dropdown + Settings */}
+            {/* Right Actions: Analytics + Thesis Docs + Search + Plus/Prompt AI + Settings */}
             <div className="flex items-center gap-1 sm:gap-1.5">
               <button
                 type="button"
@@ -471,84 +472,71 @@ export default function App() {
                 <Search className="w-4 h-4" />
               </button>
 
-              {/* Plus Action Menu */}
-              <div className="relative">
+              {/* If Admin: show full "+ Thêm" menu. If Student: hide + Thêm, show direct Prompt AI */}
+              {settings.isAdmin ? (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setPlusMenuOpen((v) => !v)}
+                    className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-medium text-xs sm:text-sm flex items-center gap-1 shadow-sm transition active:scale-95"
+                    title="Thêm mới"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">Thêm</span>
+                  </button>
+
+                  {plusMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setPlusMenuOpen(false)} />
+                      <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl p-1.5 z-50 shadow-2xl space-y-0.5 border border-slate-200">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPlusMenuOpen(false);
+                            setImportOpen(true);
+                          }}
+                          className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
+                        >
+                          <BookPlus className="w-4 h-4 text-sky-600" />
+                          <span>Nạp bộ bài học mới</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPlusMenuOpen(false);
+                            setEditorMode('new_folder');
+                          }}
+                          className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
+                        >
+                          <FolderPlus className="w-4 h-4 text-emerald-600" />
+                          <span>Tạo thư mục mới</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPlusMenuOpen(false);
+                            setPromptOpen(true);
+                          }}
+                          className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
+                        >
+                          <Sparkles className="w-4 h-4 text-amber-500" />
+                          <span>Prompt tạo thẻ AI</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
                 <button
                   type="button"
-                  onClick={() => setPlusMenuOpen((v) => !v)}
-                  className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-medium text-xs sm:text-sm flex items-center gap-1 shadow-sm transition active:scale-95"
-                  title="Thêm mới"
+                  onClick={() => setPromptOpen(true)}
+                  className="glass-pill px-2.5 py-1.5 rounded-xl text-xs font-medium text-amber-700 hover:text-amber-800 hover:bg-amber-50 flex items-center gap-1 transition"
+                  title="Prompt tạo thẻ AI chuẩn"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span className="hidden sm:inline">Thêm</span>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="hidden sm:inline">Prompt AI</span>
                 </button>
-
-                {plusMenuOpen && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setPlusMenuOpen(false)} />
-                    <div className="absolute right-0 top-full mt-2 w-56 bg-white/98 backdrop-blur-2xl rounded-2xl p-1.5 z-50 shadow-2xl space-y-0.5 border border-slate-200/90">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPlusMenuOpen(false);
-                          if (settings.isAdmin) setImportOpen(true);
-                          else showToast('Cần quyền Chủ sở hữu để nạp bài học mới.');
-                        }}
-                        className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
-                      >
-                        <BookPlus className="w-4 h-4 text-sky-600" />
-                        <span>Nạp bộ bài học mới</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPlusMenuOpen(false);
-                          if (settings.isAdmin) setEditorMode('new_folder');
-                          else showToast('Cần quyền Chủ sở hữu để tạo thư mục.');
-                        }}
-                        className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
-                      >
-                        <FolderPlus className="w-4 h-4 text-emerald-600" />
-                        <span>Tạo thư mục mới</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPlusMenuOpen(false);
-                          setPromptOpen(true);
-                        }}
-                        className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
-                      >
-                        <Sparkles className="w-4 h-4 text-amber-500" />
-                        <span>Prompt tạo thẻ AI</span>
-                      </button>
-                      <div className="border-t border-slate-100 my-1" />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPlusMenuOpen(false);
-                          setAnalyticsOpen(true);
-                        }}
-                        className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
-                      >
-                        <TrendingUp className="w-4 h-4 text-emerald-600" />
-                        <span>Thống kê & Streak học</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPlusMenuOpen(false);
-                          setThesisDocsOpen(true);
-                        }}
-                        className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
-                      >
-                        <Brain className="w-4 h-4 text-indigo-600" />
-                        <span>Kiến trúc Đồ án & Thuật toán</span>
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+              )}
 
               <button
                 type="button"
@@ -687,7 +675,15 @@ export default function App() {
               startStudySession({ title: activeSession.title, deckIds: activeSession.deckIds, filterMode, direction: activeSession.direction })
             }
             onChangeDirection={(direction) => setActiveSession({ ...activeSession, direction, isFlipped: false })}
-            onEditCard={() => (settings.isAdmin ? setEditorMode('edit_card') : showToast('Cần mở khóa PIN để sửa thẻ.'))}
+            onEditCard={(targetCard) => {
+              if (settings.isAdmin) {
+                const cardToEdit = targetCard || (activeSession ? activeSession.queue[activeSession.currentIndex] : null);
+                setEditingCard(cardToEdit);
+                setEditorMode('edit_card');
+              } else {
+                showToast('Cần mở khóa PIN để sửa thẻ.');
+              }
+            }}
             onRestartSession={(filterMode) =>
               startStudySession({ title: activeSession.title, deckIds: activeSession.deckIds, filterMode, direction: activeSession.direction })
             }
@@ -707,9 +703,13 @@ export default function App() {
       <PromptModal isOpen={promptOpen} onClose={() => setPromptOpen(false)} onCopySuccess={() => showToast('Đã sao chép Prompt chuẩn!')} />
 
       <EditorModal
+        key={editorMode ? `${editorMode}_${editingCard?.id || (activeSession ? activeSession.queue[activeSession.currentIndex]?.id : 'none')}` : 'closed'}
         mode={editorMode}
-        card={activeSession ? activeSession.queue[activeSession.currentIndex] : null}
-        onClose={() => setEditorMode(null)}
+        card={editingCard || (activeSession ? activeSession.queue[activeSession.currentIndex] : null)}
+        onClose={() => {
+          setEditorMode(null);
+          setEditingCard(null);
+        }}
         onSaveFolder={({ name, icon }) => {
           if (!name) return showToast('Vui lòng nhập tên thư mục!');
           persistAndSyncContent({
@@ -720,7 +720,7 @@ export default function App() {
           showToast(`Đã tạo thư mục "${name}"`);
         }}
         onSaveCard={(updated) => {
-          const target = activeSession.queue[activeSession.currentIndex];
+          const target = editingCard || activeSession.queue[activeSession.currentIndex];
           const nextDecks = appData.decks.map((d) => ({
             ...d,
             cards: d.cards.map((c) => (c.id === target.id ? { ...c, ...updated } : c)),
@@ -729,6 +729,7 @@ export default function App() {
           const nextQueue = activeSession.queue.map((c, idx) => (idx === activeSession.currentIndex ? { ...c, ...updated } : c));
           setActiveSession({ ...activeSession, queue: nextQueue });
           setEditorMode(null);
+          setEditingCard(null);
           showToast('Đã cập nhật nội dung thẻ!');
         }}
       />

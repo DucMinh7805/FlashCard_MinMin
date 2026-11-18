@@ -16,17 +16,35 @@ import {
   FolderInput,
   FileText,
   User,
+  Flame,
+  GripVertical,
 } from 'lucide-react';
-import { computeStatsForCards } from '../lib/spacedRepetition';
+import { computeStatsForCards, computeStudyStreak } from '../lib/spacedRepetition';
 import ConfirmModal from './ConfirmModal';
 
 function stripCloze(text) {
   return (text || '').replace(/\{\{c\d+::(.*?)\}\}/g, '$1');
 }
 
+function getDescendantFolderIds(rootId, allFolders) {
+  const set = new Set([rootId]);
+  let added = true;
+  while (added) {
+    added = false;
+    for (const f of allFolders) {
+      if (f.parentId && set.has(f.parentId) && !set.has(f.id)) {
+        set.add(f.id);
+        added = true;
+      }
+    }
+  }
+  return set;
+}
+
 export default function DriveExplorer({
   appData,
   progressMap,
+  activityLogs = {},
   currentFolderId,
   setCurrentFolderId,
   searchQuery,
@@ -37,6 +55,8 @@ export default function DriveExplorer({
   onMoveFolder,
   onEditDeck,
   onMoveDeck,
+  onQuickMoveFolder,
+  onQuickMoveDeck,
   onViewNote,
   onDeleteFolder,
   onDeleteDeck,
@@ -48,6 +68,8 @@ export default function DriveExplorer({
   const [openMenuFolderId, setOpenMenuFolderId] = useState(null);
   const [openMenuDeckId, setOpenMenuDeckId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [draggedItem, setDraggedItem] = useState(null); // { type: 'folder' | 'deck', id: string, name: string }
+  const [dragOverFolderId, setDragOverFolderId] = useState(null);
 
   useEffect(() => {
     const handleOutsideClick = () => {
@@ -87,20 +109,57 @@ export default function DriveExplorer({
   }
 
   const greenPct = scopeStats.total ? Math.round((scopeStats.green / scopeStats.total) * 100) : 0;
+  const { streak } = computeStudyStreak(activityLogs);
+
+  const handleDropOnFolder = (targetFolderId) => {
+    if (!draggedItem) return;
+    if (draggedItem.type === 'deck') {
+      if (onQuickMoveDeck) {
+        onQuickMoveDeck(draggedItem.id, targetFolderId);
+      }
+    } else if (draggedItem.type === 'folder') {
+      if (draggedItem.id === targetFolderId) return;
+      const descendantIds = getDescendantFolderIds(draggedItem.id, appData.folders);
+      if (descendantIds.has(targetFolderId)) return;
+      if (onQuickMoveFolder) {
+        onQuickMoveFolder(draggedItem.id, targetFolderId);
+      }
+    }
+    setDraggedItem(null);
+    setDragOverFolderId(null);
+  };
 
   return (
     <section className="space-y-4">
-      {/* Breadcrumbs Navigation Bar */}
+      {/* Breadcrumbs Navigation Bar with Drop-to-Move Target */}
       <div className="glass-panel rounded-2xl p-2 sm:p-2.5 flex items-center justify-between gap-2 shadow-sm">
         <nav className="flex items-center gap-1 text-xs sm:text-sm overflow-x-auto max-w-full py-0.5">
           <button
             type="button"
             onClick={() => setCurrentFolderId(null)}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (draggedItem) setDragOverFolderId('root');
+            }}
+            onDragLeave={() => {
+              if (dragOverFolderId === 'root') setDragOverFolderId(null);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOverFolderId(null);
+              if (!draggedItem) return;
+              if (draggedItem.type === 'deck') onQuickMoveDeck?.(draggedItem.id, null);
+              if (draggedItem.type === 'folder') onQuickMoveFolder?.(draggedItem.id, null);
+              setDraggedItem(null);
+            }}
             className={`px-2 py-1 rounded-lg flex items-center gap-1.5 transition whitespace-nowrap ${
-              currentFolderId === null
-                ? 'bg-sky-100 text-sky-800 font-bold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+              dragOverFolderId === 'root'
+                ? 'bg-sky-200 text-sky-900 font-bold ring-2 ring-sky-500 scale-105'
+                : currentFolderId === null
+                  ? 'bg-sky-100 text-sky-800 font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
             }`}
+            title="Kéo môn học hoặc bài vào đây để chuyển ra thư mục gốc"
           >
             <Home className="w-3.5 h-3.5 text-sky-600" />
             <span>Kho môn học</span>
@@ -111,11 +170,26 @@ export default function DriveExplorer({
               <button
                 type="button"
                 onClick={() => setCurrentFolderId(folder.id)}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (draggedItem && draggedItem.id !== folder.id) setDragOverFolderId(folder.id);
+                }}
+                onDragLeave={() => {
+                  if (dragOverFolderId === folder.id) setDragOverFolderId(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOverFolderId(null);
+                  handleDropOnFolder(folder.id);
+                }}
                 className={`px-2 py-1 rounded-lg transition whitespace-nowrap ${
-                  folder.id === currentFolderId
-                    ? 'bg-sky-100 text-sky-800 font-bold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  dragOverFolderId === folder.id
+                    ? 'bg-sky-200 text-sky-900 font-bold ring-2 ring-sky-500 scale-105'
+                    : folder.id === currentFolderId
+                      ? 'bg-sky-100 text-sky-800 font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                 }`}
+                title={`Kéo thả vào để chuyển sang thư mục "${folder.name}"`}
               >
                 <span>{folder.icon || '📁'}</span>
                 <span className="ml-1">{folder.name}</span>
@@ -125,24 +199,6 @@ export default function DriveExplorer({
         </nav>
 
         <div className="flex items-center gap-1.5 shrink-0 ml-auto">
-          {scopeStats.total > 0 && (
-            <button
-              type="button"
-              onClick={() =>
-                onStartStudy({
-                  title: currentFolderObj ? `Thư mục: ${currentFolderObj.name}` : 'Toàn bộ Kho môn học',
-                  deckIds: scopeDeckIds,
-                  filterMode: 'all',
-                })
-              }
-              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs flex items-center gap-1.5 shadow-sm transition active:scale-95"
-              title="Ôn tập toàn bộ thẻ trong mục này"
-            >
-              <Play className="w-3 h-3 fill-current" />
-              <span>Ôn mục này ({scopeStats.total})</span>
-            </button>
-          )}
-
           <button
             type="button"
             onClick={() =>
@@ -179,69 +235,102 @@ export default function DriveExplorer({
         </div>
       </div>
 
-      {/* Progress Strip (4 distinct stages: Green, Yellow, Red, Gray) */}
-      <div className="glass-card rounded-2xl px-3.5 py-2 flex flex-wrap items-center justify-between gap-3 text-xs shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 font-bold text-slate-800">
-            <Layers className="w-4 h-4 text-sky-600" />
-            <span>{scopeStats.total} thẻ</span>
+      {/* Hero Stats Card: Rõ ràng, trực quan, tối ưu cho cả Mobile & Desktop */}
+      <div className="glass-panel rounded-3xl p-4 sm:p-5 shadow-sm space-y-3.5 border border-white/90">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-200/80 flex items-center justify-center text-amber-700 shadow-inner">
+              <Flame className="w-4 h-4 fill-current" />
+            </div>
+            <div>
+              <span className="font-extrabold text-slate-800 text-sm sm:text-base">Chuỗi học tập</span>
+              <span className="ml-1.5 text-xs text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60">
+                {streak ? `${streak} ngày liên tục` : 'Bắt đầu ngay'}
+              </span>
+            </div>
           </div>
-          {scopeStats.due > 0 && (
-            <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold text-[11px]">
-              {scopeStats.due} cần ôn hôm nay
+
+          {scopeStats.due > 0 ? (
+            <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 font-bold text-xs border border-rose-200 shadow-2xs">
+              ⚡ {scopeStats.due} thẻ cần ôn hôm nay
+            </span>
+          ) : (
+            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-xs border border-emerald-200 shadow-2xs">
+              ✨ Đã hoàn thành các thẻ hôm nay!
             </span>
           )}
-          <div className="hidden sm:flex items-center gap-2 text-[11px] text-slate-500 border-l border-slate-200 pl-3">
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> {scopeStats.green} Thuộc
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> {scopeStats.yellow} Tạm hiểu
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> {scopeStats.red} Chưa nhớ
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-slate-300 inline-block" /> {scopeStats.newCount || 0} Chưa học
-            </span>
+        </div>
+
+        {/* 3 Metrics Badges */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 text-center">
+          <div className="bg-white/80 p-2.5 rounded-2xl border border-slate-200/70 shadow-2xs">
+            <p className="text-[11px] text-slate-500 font-medium">Tổng số thẻ</p>
+            <p className="text-base sm:text-xl font-extrabold text-slate-800 mt-0.5">{scopeStats.total}</p>
+            <p className="text-[10px] text-slate-400">thẻ toàn mục</p>
+          </div>
+
+          <div className="bg-rose-50/70 p-2.5 rounded-2xl border border-rose-100 shadow-2xs">
+            <p className="text-[11px] text-rose-600 font-semibold">Chưa nhớ</p>
+            <p className="text-base sm:text-xl font-extrabold text-rose-700 mt-0.5">{scopeStats.red}</p>
+            <p className="text-[10px] text-rose-500 font-medium">{scopeStats.due} cần ôn gấp</p>
+          </div>
+
+          <div className="bg-emerald-50/70 p-2.5 rounded-2xl border border-emerald-100 shadow-2xs">
+            <p className="text-[11px] text-emerald-700 font-semibold">Đã thuộc</p>
+            <p className="text-base sm:text-xl font-extrabold text-emerald-700 mt-0.5">{greenPct}%</p>
+            <p className="text-[10px] text-emerald-600 font-medium">{scopeStats.green}/{scopeStats.total} thẻ</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-1 sm:max-w-xs min-w-[130px]">
-          <div className="flex-1 h-2 rounded-full bg-slate-200/80 overflow-hidden flex shadow-inner">
+        {/* Retention Progress Bar */}
+        <div className="space-y-1.5 pt-1">
+          <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+            <span className="flex items-center gap-2">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> {scopeStats.green} Thuộc</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> {scopeStats.yellow} Tạm hiểu</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> {scopeStats.red} Chưa nhớ</span>
+              {(scopeStats.newCount || 0) > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300 inline-block" /> {scopeStats.newCount} Mới</span>}
+            </span>
+            <span className="text-emerald-700 font-bold text-xs">{greenPct}% Ghi nhớ</span>
+          </div>
+
+          <div className="w-full h-2.5 rounded-full bg-slate-200/80 overflow-hidden flex shadow-inner">
             {scopeStats.total > 0 && scopeStats.green > 0 && (
-              <div
-                style={{ width: `${(scopeStats.green / scopeStats.total) * 100}%` }}
-                className="bg-emerald-500 h-full shrink-0"
-                title={`Đã thuộc: ${scopeStats.green}`}
-              />
+              <div style={{ width: `${(scopeStats.green / scopeStats.total) * 100}%` }} className="bg-emerald-500 h-full shrink-0" />
             )}
             {scopeStats.total > 0 && scopeStats.yellow > 0 && (
-              <div
-                style={{ width: `${(scopeStats.yellow / scopeStats.total) * 100}%` }}
-                className="bg-amber-400 h-full shrink-0"
-                title={`Tạm hiểu: ${scopeStats.yellow}`}
-              />
+              <div style={{ width: `${(scopeStats.yellow / scopeStats.total) * 100}%` }} className="bg-amber-400 h-full shrink-0" />
             )}
             {scopeStats.total > 0 && scopeStats.red > 0 && (
-              <div
-                style={{ width: `${(scopeStats.red / scopeStats.total) * 100}%` }}
-                className="bg-rose-500 h-full shrink-0"
-                title={`Chưa nhớ: ${scopeStats.red}`}
-              />
+              <div style={{ width: `${(scopeStats.red / scopeStats.total) * 100}%` }} className="bg-rose-500 h-full shrink-0" />
             )}
             {scopeStats.total > 0 && (scopeStats.newCount || 0) > 0 && (
-              <div
-                style={{ width: `${((scopeStats.newCount || 0) / scopeStats.total) * 100}%` }}
-                className="bg-slate-300 h-full shrink-0"
-                title={`Chưa học: ${scopeStats.newCount || 0}`}
-              />
+              <div style={{ width: `${((scopeStats.newCount || 0) / scopeStats.total) * 100}%` }} className="bg-slate-300 h-full shrink-0" />
             )}
           </div>
-          <span className="text-[11px] font-bold text-emerald-700 whitespace-nowrap">
-            {greenPct}% Thuộc
-          </span>
         </div>
+
+        {/* Quick Review Button */}
+        {scopeStats.total > 0 && (
+          <button
+            type="button"
+            onClick={() =>
+              onStartStudy({
+                title: currentFolderObj ? `Thư mục: ${currentFolderObj.name}` : 'Toàn bộ Kho môn học',
+                deckIds: scopeDeckIds,
+                filterMode: scopeStats.due > 0 ? 'due_only' : 'all',
+              })
+            }
+            className="w-full py-2.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition active:scale-98"
+          >
+            <Play className="w-4 h-4 fill-current" />
+            <span>
+              {scopeStats.due > 0
+                ? `ÔN TẬP NGAY (${scopeStats.due} THẺ CẦN ÔN HÔM NAY)`
+                : `ÔN TẬP TOÀN BỘ (${scopeStats.total} THẺ)`}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Global Search Results */}
@@ -299,8 +388,36 @@ export default function DriveExplorer({
               return (
                 <div
                   key={folder.id}
+                  draggable={true}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('application/json', JSON.stringify({ type: 'folder', id: folder.id, name: folder.name }));
+                    e.dataTransfer.effectAllowed = 'move';
+                    setDraggedItem({ type: 'folder', id: folder.id, name: folder.name });
+                  }}
+                  onDragEnd={() => {
+                    setDraggedItem(null);
+                    setDragOverFolderId(null);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (draggedItem && draggedItem.id !== folder.id) {
+                      setDragOverFolderId(folder.id);
+                    }
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverFolderId === folder.id) setDragOverFolderId(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOverFolderId(null);
+                    handleDropOnFolder(folder.id);
+                  }}
                   onClick={() => setCurrentFolderId(folder.id)}
                   className={`glass-card rounded-2xl p-3.5 flex flex-col justify-between gap-2.5 cursor-pointer shadow-sm hover:border-sky-300 transition ${
+                    dragOverFolderId === folder.id
+                      ? 'drag-over-active ring-2 ring-sky-500 bg-sky-50/90'
+                      : ''
+                  } ${
                     isFolderMenuOpen ? 'relative z-40' : 'relative z-10'
                   }`}
                 >
@@ -480,13 +597,24 @@ export default function DriveExplorer({
                 return (
                   <div
                     key={deck.id}
-                    className={`glass-card rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between gap-3 shadow-sm hover:border-sky-300 transition ${
+                    draggable={true}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('application/json', JSON.stringify({ type: 'deck', id: deck.id, name: deck.name }));
+                      e.dataTransfer.effectAllowed = 'move';
+                      setDraggedItem({ type: 'deck', id: deck.id, name: deck.name });
+                    }}
+                    onDragEnd={() => {
+                      setDraggedItem(null);
+                      setDragOverFolderId(null);
+                    }}
+                    className={`glass-card rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between gap-3 shadow-sm hover:border-sky-300 transition cursor-grab active:cursor-grabbing ${
                       isMenuOpen ? 'relative z-40' : 'relative z-10'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
+                          <GripVertical className="w-3.5 h-3.5 text-slate-400 shrink-0 cursor-grab hover:text-sky-600 transition" title="Kéo bài học này thả vào thư mục khác" />
                           <BookOpen className="w-4 h-4 text-sky-600 shrink-0" />
                           <h3 className="font-bold text-slate-800 text-sm sm:text-base line-clamp-2 leading-snug break-words">
                             {deck.name}

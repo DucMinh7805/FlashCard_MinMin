@@ -712,7 +712,7 @@ export default function App() {
       {!activeSession && (
         <header className={`sticky top-0 px-3 sm:px-4 pt-2.5 pb-2 transition-all ${plusMenuOpen ? 'z-50' : 'z-30'}`}>
           <div className="max-w-5xl mx-auto glass-panel rounded-2xl px-3 sm:px-4 py-2 flex items-center justify-between gap-2 shadow-sm">
-            {/* Logo & App Title */}
+            {/* Logo & App Title (Clean, minimal, no cluttered student/thesis labels) */}
             <button
               type="button"
               onClick={() => {
@@ -721,13 +721,13 @@ export default function App() {
               }}
               className="flex items-center gap-2 text-left"
             >
-              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 text-white flex items-center justify-center font-bold text-base shadow-sm">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0">
                 M
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="font-bold tracking-tight text-slate-800 text-sm sm:text-base">FlashCard MinMin</span>
                 <span
-                  className={`w-2 h-2 rounded-full inline-block ${
+                  className={`w-2 h-2 rounded-full inline-block shrink-0 ${
                     isCloudSyncing
                       ? 'bg-amber-400 animate-pulse'
                       : settings.supabaseUrl
@@ -736,39 +736,18 @@ export default function App() {
                   }`}
                   title={isCloudSyncing ? 'Đang đồng bộ Cloud...' : 'Đám mây Mini Drive kết nối'}
                 />
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSettingsOpen(true);
-                  }}
-                  className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 text-[11px] font-semibold border border-sky-200/80 transition"
-                  title="Bấm để đổi tên thành viên"
-                >
-                  <User className="w-3 h-3 text-sky-600" />
-                  <span className="truncate max-w-[85px]">{settings.studentName || 'Học viên'}</span>
-                </button>
               </div>
             </button>
 
-            {/* Right Actions: Analytics + Docs + Search + Plus/Prompt AI + Settings */}
+            {/* Right Actions: Clean, consistent Liquid Glass icons */}
             <div className="flex items-center gap-1 sm:gap-1.5">
               <button
                 type="button"
                 onClick={() => setAnalyticsOpen(true)}
                 className="glass-pill w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-slate-600 hover:text-slate-900 flex items-center justify-center transition"
-                title="Thống kê học tập & Streak"
+                title="Thống kê học tập"
               >
                 <TrendingUp className="w-4 h-4 text-emerald-600" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setThesisDocsOpen(true)}
-                className="glass-pill w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-slate-600 hover:text-slate-900 flex items-center justify-center transition"
-                title="Hướng dẫn sử dụng & Cơ chế Spaced Repetition"
-              >
-                <Brain className="w-4 h-4 text-indigo-600" />
               </button>
 
               <button
@@ -782,7 +761,7 @@ export default function App() {
                 <Search className="w-4 h-4" />
               </button>
 
-              {/* Full "+ Thêm" menu available to ALL 10 members */}
+              {/* "+ Thêm" menu */}
               <div className="relative">
                 <button
                   type="button"
@@ -876,7 +855,7 @@ export default function App() {
       )}
 
       {/* Main Container */}
-      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-4">
+      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-4 pb-6 sm:pb-8">
         {/* Resume Banner */}
         {!activeSession && resumeCandidate && (
           <div className="glass-panel rounded-2xl p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-2.5 shadow-sm border-l-4 border-l-sky-500">
@@ -916,6 +895,7 @@ export default function App() {
           <DriveExplorer
             appData={appData}
             progressMap={progressMap}
+            activityLogs={activityLogs}
             currentFolderId={currentFolderId}
             setCurrentFolderId={setCurrentFolderId}
             searchQuery={searchQuery}
@@ -938,6 +918,8 @@ export default function App() {
               setSelectedDeckForAction(d);
               setEditorMode('move_deck');
             }}
+            onQuickMoveFolder={handleMoveFolder}
+            onQuickMoveDeck={handleMoveDeck}
             onViewNote={(d) => {
               setSelectedDeckForAction(d);
               setEditorMode('view_note');
@@ -1008,6 +990,8 @@ export default function App() {
           />
         )}
       </main>
+
+
 
       {/* Modals */}
       <ImportModal

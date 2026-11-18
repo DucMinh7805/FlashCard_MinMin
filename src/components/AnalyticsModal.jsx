@@ -79,17 +79,20 @@ export default function AnalyticsModal({
   const weakestSubject = subjectsWithCards.length > 0 ? subjectsWithCards[0] : null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
-      <div className="glass-panel bg-white/95 rounded-3xl max-w-2xl w-full p-4 sm:p-6 space-y-4 max-h-[92vh] overflow-y-auto shadow-2xl border border-white/90">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-rose-500 text-white flex items-center justify-center shadow-md">
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
+      <div className="glass-panel bg-white/95 rounded-t-[32px] sm:rounded-3xl max-w-2xl w-full max-h-[90vh] sm:max-h-[92vh] overflow-hidden flex flex-col shadow-2xl border border-white/90">
+        {/* Mobile Pull Indicator */}
+        <div className="sm:hidden w-12 h-1.5 bg-slate-300 rounded-full mx-auto mt-2.5 mb-0.5 shrink-0" />
+
+        {/* Sticky Header */}
+        <div className="px-4 sm:px-6 pt-3 pb-3 border-b border-slate-100 flex items-center justify-between gap-2 shrink-0 bg-white/80">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-rose-500 text-white flex items-center justify-center shadow-md shrink-0">
               <TrendingUp className="w-5 h-5" />
             </div>
-            <div>
-              <h3 className="text-base sm:text-lg font-bold text-slate-800">Thống kê & Phân tích Học tập</h3>
-              <p className="text-xs text-slate-500">Tiến độ Spaced Repetition cá nhân & Biểu đồ ghi nhớ</p>
+            <div className="min-w-0">
+              <h3 className="text-sm sm:text-lg font-bold text-slate-800 truncate">Thống kê Học tập & Chuỗi Streak</h3>
+              <p className="text-[11px] sm:text-xs text-slate-500 truncate">Tiến độ ôn luyện cá nhân & Biểu đồ ghi nhớ</p>
             </div>
           </div>
           <button
@@ -101,44 +104,46 @@ export default function AnalyticsModal({
           </button>
         </div>
 
-        {/* 4 Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <div className="glass-card rounded-2xl p-3 flex flex-col justify-between border-amber-200/80 bg-amber-50/40">
-            <div className="flex items-center justify-between text-amber-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Streak</span>
-              <Flame className="w-4 h-4 fill-current" />
+        {/* Scrollable Content */}
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-4">
+          {/* 4 Summary Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="glass-card rounded-2xl p-3 flex flex-col justify-between border-amber-200/80 bg-amber-50/40">
+              <div className="flex items-center justify-between text-amber-600">
+                <span className="text-[11px] font-bold uppercase tracking-wider">Streak</span>
+                <Flame className="w-4 h-4 fill-current" />
+              </div>
+              <p className="text-xl sm:text-2xl font-black text-amber-700 mt-1">{streak} ngày</p>
+              <p className="text-[10px] text-amber-600/80 mt-0.5">Liên tục ôn tập</p>
             </div>
-            <p className="text-xl sm:text-2xl font-black text-amber-700 mt-1">{streak} ngày</p>
-            <p className="text-[10px] text-amber-600/80 mt-0.5">Liên tục ôn tập</p>
-          </div>
 
-          <div className="glass-card rounded-2xl p-3 flex flex-col justify-between border-sky-200/80 bg-sky-50/40">
-            <div className="flex items-center justify-between text-sky-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Hôm nay</span>
-              <Calendar className="w-4 h-4" />
+            <div className="glass-card rounded-2xl p-3 flex flex-col justify-between border-sky-200/80 bg-sky-50/40">
+              <div className="flex items-center justify-between text-sky-600">
+                <span className="text-[11px] font-bold uppercase tracking-wider">Hôm nay</span>
+                <Calendar className="w-4 h-4" />
+              </div>
+              <p className="text-xl sm:text-2xl font-black text-sky-700 mt-1">{todayCount} thẻ</p>
+              <p className="text-[10px] text-sky-600/80 mt-0.5">Lượt thẻ đã lật</p>
             </div>
-            <p className="text-xl sm:text-2xl font-black text-sky-700 mt-1">{todayCount} thẻ</p>
-            <p className="text-[10px] text-sky-600/80 mt-0.5">Lượt thẻ đã lật</p>
-          </div>
 
-          <div className="glass-card rounded-2xl p-3 flex flex-col justify-between border-emerald-200/80 bg-emerald-50/40">
-            <div className="flex items-center justify-between text-emerald-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Tỷ lệ nhớ</span>
-              <CheckCircle2 className="w-4 h-4" />
+            <div className="glass-card rounded-2xl p-3 flex flex-col justify-between border-emerald-200/80 bg-emerald-50/40">
+              <div className="flex items-center justify-between text-emerald-600">
+                <span className="text-[11px] font-bold uppercase tracking-wider">Tỷ lệ nhớ</span>
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+              <p className="text-xl sm:text-2xl font-black text-emerald-700 mt-1">{greenPct}%</p>
+              <p className="text-[10px] text-emerald-600/80 mt-0.5">{overallStats.green} / {overallStats.total} thẻ</p>
             </div>
-            <p className="text-xl sm:text-2xl font-black text-emerald-700 mt-1">{greenPct}%</p>
-            <p className="text-[10px] text-emerald-600/80 mt-0.5">{overallStats.green} / {overallStats.total} thẻ</p>
-          </div>
 
-          <div className="glass-card rounded-2xl p-3 flex flex-col justify-between border-rose-200/80 bg-rose-50/40">
-            <div className="flex items-center justify-between text-rose-600">
-              <span className="text-[11px] font-bold uppercase tracking-wider">Cần ôn</span>
-              <AlertCircle className="w-4 h-4" />
+            <div className="glass-card rounded-2xl p-3 flex flex-col justify-between border-rose-200/80 bg-rose-50/40">
+              <div className="flex items-center justify-between text-rose-600">
+                <span className="text-[11px] font-bold uppercase tracking-wider">Cần ôn</span>
+                <AlertCircle className="w-4 h-4" />
+              </div>
+              <p className="text-xl sm:text-2xl font-black text-rose-700 mt-1">{overallStats.due} thẻ</p>
+              <p className="text-[10px] text-rose-600/80 mt-0.5">Cần ôn tập ngay</p>
             </div>
-            <p className="text-xl sm:text-2xl font-black text-rose-700 mt-1">{overallStats.due} thẻ</p>
-            <p className="text-[10px] text-rose-600/80 mt-0.5">Đến hạn Spaced Rep</p>
           </div>
-        </div>
 
         {/* 7-day Activity Chart */}
         <div className="glass-card rounded-2xl p-3.5 space-y-2 border-slate-200/80">
@@ -299,5 +304,6 @@ export default function AnalyticsModal({
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 }

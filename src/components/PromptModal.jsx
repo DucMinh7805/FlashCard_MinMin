@@ -6,14 +6,14 @@ const STANDARD_PROMPT = `Hãy chuyển đổi tài liệu bài học dưới đ�
 Yêu cầu cấu trúc JSON chính xác:
 {
   "deck": "Tên bài học (Ví dụ: Bài 1 - X-ray & CT lồng ngực)",
-  "note": "Tóm tắt trọng tâm / Ghi chú lâm sàng nhanh của bài học (tùy chọn, để \\"\\" nếu không có)",
+  "note": "Tóm tắt trọng tâm / Ghi chú lâm sàng nhanh của bài học (tùy chọn, để \"\" nếu không có)",
   "cards": [
     {
       "type": "basic | cloze | case",
       "front": "Câu hỏi, thuật ngữ, hoặc câu có chứa {{c1::từ khóa ẩn}} nếu là kiểu cloze",
-      "back": "Đáp án ngắn gọn, chính xác (dùng \\\\n- nếu có nhiều ý)",
-      "hint": "Gợi ý ngắn giúp nhớ lại (để \\"\\" nếu không cần)",
-      "extra": "Giải thích cơ chế, lưu ý lâm sàng hoặc mở rộng (để \\"\\" nếu không cần)",
+      "back": "Đáp án ngắn gọn, chính xác (dùng \\n- nếu có nhiều ý)",
+      "hint": "Gợi ý ngắn giúp nhớ lại (để \"\" nếu không cần)",
+      "extra": "Giải thích cơ chế, lưu ý lâm sàng hoặc mở rộng (để \"\" nếu không cần)",
       "image": ""
     }
   ]

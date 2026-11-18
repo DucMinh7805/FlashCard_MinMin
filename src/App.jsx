@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Search, Plus, Settings, Sparkles, FolderPlus, BookPlus, Play, X } from 'lucide-react';
 import { DEFAULT_DECKS, DEFAULT_FOLDERS } from './data/seedData';
 import { calculateNextProgress, getCardProgress, isCardDue } from './lib/spacedRepetition';
 import { DEFAULT_SUPABASE_KEY, DEFAULT_SUPABASE_URL, pullCloudData, pushCloudData } from './lib/supabase';
@@ -54,6 +55,8 @@ export default function App() {
 
   const [currentFolderId, setCurrentFolderId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [activeSession, setActiveSession] = useState(null);
   const [resumeCandidate, setResumeCandidate] = useState(() => {
     const saved = safeGet(STORAGE_KEY_SESSION, null);
@@ -379,92 +382,161 @@ export default function App() {
   };
 
   return (
-    <div>
-      {/* Ambient Liquid Blobs */}
+    <div className="min-h-screen text-slate-800">
+      {/* Ambient Liquid Blobs - Light Version */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-sky-500/15 blur-3xl" />
-        <div className="absolute top-1/3 -right-24 w-96 h-96 rounded-full bg-indigo-500/15 blur-3xl" />
-        <div className="absolute -bottom-28 left-1/4 w-96 h-96 rounded-full bg-teal-400/10 blur-3xl" />
+        <div className="absolute -top-20 -left-20 w-96 h-96 rounded-full bg-sky-300/30 blur-3xl" />
+        <div className="absolute top-1/3 -right-20 w-96 h-96 rounded-full bg-indigo-300/25 blur-3xl" />
+        <div className="absolute -bottom-20 left-1/4 w-96 h-96 rounded-full bg-teal-200/30 blur-3xl" />
       </div>
 
-      {/* Top Navigation */}
-      <header className="sticky top-0 z-30 px-4 pt-3 pb-2">
-        <div className="max-w-5xl mx-auto glass-panel rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveSession(null);
-              setCurrentFolderId(null);
-            }}
-            className="flex items-center gap-2.5 text-left"
-          >
-            <div className="w-9 h-9 rounded-xl glass-pill flex items-center justify-center text-sky-300 font-bold text-lg">M</div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold tracking-tight text-white text-sm sm:text-base">FlashCard MinMin</span>
-                <span
-                  className={`text-[11px] px-2 py-0.5 rounded-full font-medium border ${
-                    settings.isAdmin
-                      ? 'bg-emerald-400/20 text-emerald-200 border-emerald-400/30'
-                      : 'bg-slate-500/20 text-slate-300 border-slate-400/30'
-                  }`}
-                >
-                  {settings.isAdmin ? 'Chủ sở hữu' : 'Khách (Chỉ học)'}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-300/80">
-                {settings.supabaseUrl ? 'Đã kết nối Cloud Supabase • Tiến độ lưu riêng từng máy' : 'Kho nội dung Local'}
-              </p>
-            </div>
-          </button>
-
-          <div className="flex-1 min-w-[200px] max-w-md relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm môn, bài học hoặc thuật ngữ..."
-              className="w-full glass-input rounded-xl pl-9 pr-8 py-1.5 text-sm placeholder:text-slate-400"
-            />
-            <svg className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.85-5.15a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            {searchQuery && (
-              <button type="button" onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs">
-                ✕
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => setPromptOpen(true)} className="glass-pill px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium text-sky-200 flex items-center gap-1.5">
-              <span>📋</span>
-              <span className="hidden sm:inline">Prompt tạo thẻ</span>
-            </button>
+      {/* Top Navigation - Streamlined 1-row header, hidden during Study Session */}
+      {!activeSession && (
+        <header className="sticky top-0 z-30 px-3 sm:px-4 pt-2.5 pb-2">
+          <div className="max-w-5xl mx-auto glass-panel rounded-2xl px-3 sm:px-4 py-2 flex items-center justify-between gap-2 shadow-sm">
+            {/* Logo & App Title */}
             <button
               type="button"
-              onClick={() => (settings.isAdmin ? setImportOpen(true) : showToast('Cần quyền Chủ sở hữu để nạp thẻ mới.'))}
-              className="glass-pill px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium text-white flex items-center gap-1.5"
+              onClick={() => {
+                setActiveSession(null);
+                setCurrentFolderId(null);
+              }}
+              className="flex items-center gap-2 text-left"
             >
-              <span>＋</span>
-              <span>Nạp thẻ</span>
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-500 text-white flex items-center justify-center font-bold text-base shadow-sm">
+                M
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold tracking-tight text-slate-800 text-sm sm:text-base">FlashCard MinMin</span>
+                <span
+                  className={`w-2 h-2 rounded-full inline-block ${
+                    settings.supabaseUrl ? 'bg-emerald-500 ring-2 ring-emerald-200' : 'bg-slate-300'
+                  }`}
+                  title={settings.supabaseUrl ? 'Cloud Supabase đã kết nối' : 'Kho dữ liệu Local'}
+                />
+              </div>
             </button>
-            <button type="button" onClick={() => setSettingsOpen(true)} className="glass-pill p-2 rounded-xl text-slate-200 hover:text-white" title="Cài đặt">
-              ⚙
-            </button>
-          </div>
-        </div>
-      </header>
 
-      <main className="max-w-5xl mx-auto px-4 pt-3 space-y-4">
+            {/* Right Actions: Search + Plus Dropdown + Settings */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => setShowSearch((v) => !v)}
+                className={`glass-pill w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition ${
+                  showSearch || searchQuery ? 'bg-sky-100/90 text-sky-700 border-sky-300' : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Tìm kiếm"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+
+              {/* Plus Action Menu */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setPlusMenuOpen((v) => !v)}
+                  className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-medium text-xs sm:text-sm flex items-center gap-1 shadow-sm transition active:scale-95"
+                  title="Thêm mới"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">Thêm</span>
+                </button>
+
+                {plusMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setPlusMenuOpen(false)} />
+                    <div className="absolute right-0 top-full mt-2 w-52 glass-panel bg-white/95 rounded-2xl p-1.5 z-50 shadow-xl space-y-0.5 border border-white/90">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPlusMenuOpen(false);
+                          if (settings.isAdmin) setImportOpen(true);
+                          else showToast('Cần quyền Chủ sở hữu để nạp bài học mới.');
+                        }}
+                        className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
+                      >
+                        <BookPlus className="w-4 h-4 text-sky-600" />
+                        <span>Nạp bộ bài học mới</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPlusMenuOpen(false);
+                          if (settings.isAdmin) setEditorMode('new_folder');
+                          else showToast('Cần quyền Chủ sở hữu để tạo thư mục.');
+                        }}
+                        className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
+                      >
+                        <FolderPlus className="w-4 h-4 text-emerald-600" />
+                        <span>Tạo thư mục mới</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPlusMenuOpen(false);
+                          setPromptOpen(true);
+                        }}
+                        className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
+                      >
+                        <Sparkles className="w-4 h-4 text-amber-500" />
+                        <span>Prompt tạo thẻ AI</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                className="glass-pill w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-slate-600 hover:text-slate-900 flex items-center justify-center transition"
+                title="Cài đặt"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Expandable Search Input */}
+          {(showSearch || searchQuery) && (
+            <div className="max-w-5xl mx-auto mt-2">
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  autoFocus
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Tìm môn, bài học hoặc nội dung thẻ..."
+                  className="w-full glass-input rounded-xl pl-9 pr-8 py-2 text-sm placeholder:text-slate-400 shadow-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setShowSearch(false);
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </header>
+      )}
+
+      <main className="max-w-5xl mx-auto px-3 sm:px-4 pt-2 pb-6 space-y-4">
         {!activeSession && resumeCandidate && (
-          <div className="glass-panel rounded-2xl p-3.5 border-l-4 border-l-sky-400 flex flex-wrap items-center justify-between gap-3">
+          <div className="glass-panel rounded-2xl p-3 border-l-4 border-l-sky-500 flex flex-wrap items-center justify-between gap-3 shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-sky-400/20 border border-sky-400/30 flex items-center justify-center text-sky-300">⏱</div>
+              <div className="w-9 h-9 rounded-xl bg-sky-100 border border-sky-200 flex items-center justify-center text-sky-600">
+                <Play className="w-4 h-4 fill-current" />
+              </div>
               <div>
-                <p className="text-xs uppercase tracking-wider text-sky-300 font-semibold">Phiên học đang dở</p>
-                <p className="text-sm text-white font-medium">
-                  {resumeCandidate.title} — Đang ở thẻ {resumeCandidate.currentIndex + 1} / {resumeCandidate.queue.length}
+                <p className="text-[11px] uppercase tracking-wider text-sky-600 font-semibold">Phiên học đang dở</p>
+                <p className="text-sm text-slate-800 font-medium">
+                  {resumeCandidate.title} — Thẻ {resumeCandidate.currentIndex + 1} / {resumeCandidate.queue.length}
                 </p>
               </div>
             </div>
@@ -472,7 +544,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => startStudySession({ resumeState: resumeCandidate })}
-                className="px-3.5 py-1.5 rounded-xl bg-sky-500/80 hover:bg-sky-400 text-slate-950 font-semibold text-xs transition"
+                className="px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs transition shadow-sm"
               >
                 Học tiếp ngay
               </button>
@@ -482,7 +554,7 @@ export default function App() {
                   localStorage.removeItem(STORAGE_KEY_SESSION);
                   setResumeCandidate(null);
                 }}
-                className="glass-pill px-2.5 py-1.5 rounded-xl text-xs text-slate-300 hover:text-white"
+                className="glass-pill px-2.5 py-1.5 rounded-xl text-xs text-slate-600 hover:text-slate-900"
               >
                 Bỏ qua
               </button>
@@ -662,7 +734,7 @@ export default function App() {
       />
 
       {toastMsg && (
-        <div className="fixed bottom-5 right-5 z-50 glass-panel rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-medium text-white shadow-2xl border border-sky-400/30">
+        <div className="fixed bottom-5 right-5 z-50 bg-slate-900/90 text-white rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-medium shadow-2xl border border-white/20 backdrop-blur-md">
           {toastMsg}
         </div>
       )}

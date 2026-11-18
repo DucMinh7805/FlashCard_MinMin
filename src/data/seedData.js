@@ -96,7 +96,7 @@ export const DEFAULT_DECKS = [
       {
         id: 'ngoai_1',
         type: 'cloze',
-        front: 'Tam chứng Charcot trong nhiễm trùng đường mật cấp diễn tiến theo thứ tự: {{c1::Đau hạ sườn phải}} ➔ {{c2::Sốt}} ➔ {{c3::Vàng da}}.',
+        front: 'Tam chứng Charcot trong nhiễm trùng đường mật cấp diễn tiến theo thứ tự: {{c1::Đau hạ sườn phải}} → {{c2::Sốt}} → {{c3::Vàng da}}.',
         back: '1. Đau hạ sườn phải (cơn đau quặn mật)\n2. Sốt (kèm lạnh run)\n3. Vàng da tắc mật',
         hint: '3 triệu chứng kinh điển theo đúng trình tự thời gian',
         extra: 'Khi có thêm Rối loạn tri giác + Tụt huyết áp thì thành Ngũ chứng Reynolds (sốc nhiễm trùng đường mật).',

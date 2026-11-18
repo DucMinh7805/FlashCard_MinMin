@@ -1,4 +1,16 @@
 import React, { useState } from 'react';
+import {
+  X,
+  Lock,
+  Unlock,
+  Cloud,
+  Download,
+  Upload,
+  RotateCcw,
+  ShieldCheck,
+  Smartphone,
+  Check,
+} from 'lucide-react';
 
 export default function SettingsModal({
   isOpen,
@@ -19,23 +31,33 @@ export default function SettingsModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="glass-panel rounded-3xl max-w-xl w-full p-5 sm:p-6 space-y-5 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between">
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
+      <div className="glass-panel bg-white/95 rounded-3xl max-w-xl w-full p-4 sm:p-6 space-y-4 max-h-[92vh] overflow-y-auto shadow-2xl border border-white/90">
+        <div className="flex items-center justify-between gap-2">
           <div>
-            <h3 className="text-base sm:text-lg font-semibold text-white">Cấu hình Cloud, Quyền Chủ Sở Hữu & Sao lưu</h3>
-            <p className="text-xs text-slate-300">Thiết lập kho dùng chung online + bảo vệ quyền sửa xóa + sao lưu chống mất dữ liệu iOS</p>
+            <h3 className="text-base sm:text-lg font-bold text-slate-800">Cấu hình Cloud & Quyền Chủ sở hữu</h3>
+            <p className="text-xs text-slate-500">Đồng bộ Cloud đa thiết bị + bảo vệ quyền sửa bài + sao lưu tiến độ</p>
           </div>
-          <button type="button" onClick={onClose} className="glass-pill w-8 h-8 rounded-xl text-slate-300 hover:text-white">
-            ✕
+          <button
+            type="button"
+            onClick={onClose}
+            className="glass-pill w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 transition shrink-0"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="glass-card rounded-2xl p-4 space-y-2.5">
-          <div className="flex items-center justify-between">
+        {/* Admin PIN */}
+        <div className="glass-card bg-slate-50/70 rounded-2xl p-3.5 space-y-2.5 border-slate-200/80">
+          <div className="flex items-center justify-between gap-2">
             <div>
-              <p className="text-sm font-semibold text-white">Chế độ Chủ sở hữu (Admin PIN)</p>
-              <p className="text-xs text-slate-300">Khách mở link chia sẻ chỉ được học, cần mã PIN mới được tạo/sửa/xóa</p>
+              <p className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Chế độ Chủ sở hữu (Admin PIN)</span>
+              </p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Người mở link chia sẻ chỉ có thể học thẻ, cần mã PIN để tạo/sửa/xóa bài
+              </p>
             </div>
             <button
               type="button"
@@ -50,9 +72,14 @@ export default function SettingsModal({
                   showToast('Nhập đúng mã PIN vào ô bên dưới để mở khóa (mặc định: 2309).');
                 }
               }}
-              className="glass-pill px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-200"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 shrink-0 ${
+                settings.isAdmin
+                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                  : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+              }`}
             >
-              {settings.isAdmin ? 'Đang mở khóa (Chủ sở hữu)' : 'Đang khóa (Chế độ Khách)'}
+              {settings.isAdmin ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+              <span>{settings.isAdmin ? 'Chủ sở hữu' : 'Chế độ Khách'}</span>
             </button>
           </div>
           <div className="flex items-center gap-2 pt-1">
@@ -61,7 +88,7 @@ export default function SettingsModal({
               value={pinInput}
               onChange={(e) => setPinInput(e.target.value)}
               placeholder="Đặt hoặc nhập mã PIN (mặc định: 2309)"
-              className="flex-1 glass-input rounded-xl px-3 py-1.5 text-xs"
+              className="flex-1 glass-input rounded-xl px-3 py-1.5 text-xs text-slate-800"
             />
             <button
               type="button"
@@ -70,30 +97,36 @@ export default function SettingsModal({
                 onUpdateSettings({ pin: pinInput.trim(), isAdmin: true });
                 showToast('Đã cập nhật mã PIN Chủ sở hữu!');
               }}
-              className="glass-pill px-3 py-1.5 rounded-xl text-xs text-sky-200"
+              className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs shadow-sm transition"
             >
-              Lưu mã PIN
+              Lưu PIN
             </button>
           </div>
         </div>
 
-        <div className="glass-card rounded-2xl p-4 space-y-2.5">
-          <p className="text-sm font-semibold text-white">Kết nối Cloud Database (Supabase)</p>
-          <p className="text-xs text-slate-300">Đã cấu hình sẵn project Supabase của bạn. Tự động đồng bộ kho thẻ giữa PC và iPhone.</p>
+        {/* Supabase Cloud */}
+        <div className="glass-card bg-slate-50/70 rounded-2xl p-3.5 space-y-2.5 border-slate-200/80">
+          <p className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5">
+            <Cloud className="w-4 h-4 text-sky-600" />
+            <span>Kết nối Cloud Database (Supabase)</span>
+          </p>
+          <p className="text-[11px] text-slate-500">
+            Tự động đồng bộ cây thư mục và bộ thẻ giữa PC, iPhone và Android qua Supabase.
+          </p>
           <div className="space-y-2">
             <input
               type="text"
               value={supabaseUrl}
               onChange={(e) => setSupabaseUrl(e.target.value)}
               placeholder="Supabase Project URL"
-              className="w-full glass-input rounded-xl px-3 py-1.5 text-xs"
+              className="w-full glass-input rounded-xl px-3 py-1.5 text-xs text-slate-800"
             />
             <input
               type="password"
               value={supabaseKey}
               onChange={(e) => setSupabaseKey(e.target.value)}
               placeholder="Supabase Publishable / Anon Key"
-              className="w-full glass-input rounded-xl px-3 py-1.5 text-xs"
+              className="w-full glass-input rounded-xl px-3 py-1.5 text-xs text-slate-800"
             />
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -103,34 +136,59 @@ export default function SettingsModal({
                 onUpdateSettings({ supabaseUrl: supabaseUrl.trim(), supabaseKey: supabaseKey.trim() });
                 showToast('Đã lưu cấu hình Supabase Cloud!');
               }}
-              className="px-3 py-1.5 rounded-xl bg-sky-500 text-slate-950 font-semibold text-xs"
+              className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs shadow-sm transition"
             >
-              Lưu kết nối Cloud
+              Lưu Cloud
             </button>
-            <button type="button" onClick={onPushCloud} className="glass-pill px-3 py-1.5 rounded-xl text-xs text-emerald-200">
-              ☁ Đẩy dữ liệu lên Cloud
+            <button
+              type="button"
+              onClick={onPushCloud}
+              className="glass-pill px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center gap-1"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Đẩy lên Cloud</span>
             </button>
-            <button type="button" onClick={onPullCloud} className="glass-pill px-3 py-1.5 rounded-xl text-xs text-sky-200">
-              ⬇ Tải từ Cloud về máy
+            <button
+              type="button"
+              onClick={onPullCloud}
+              className="glass-pill px-3 py-1.5 rounded-xl text-xs font-semibold text-sky-700 hover:bg-sky-50 flex items-center gap-1"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Tải từ Cloud</span>
             </button>
           </div>
         </div>
 
-        <div className="glass-card rounded-2xl p-4 space-y-2.5">
-          <p className="text-sm font-semibold text-white">Sao lưu & Khôi phục toàn bộ (JSON + Tiến độ học)</p>
-          <p className="text-xs text-slate-300">
-            Mẹo trên iPhone/iOS: Chọn <strong className="text-white">Chia sẻ ➔ Thêm vào MH chính</strong> để iOS không tự xóa bộ nhớ sau 7 ngày.
+        {/* PWA / iOS Tip & Backup */}
+        <div className="glass-card bg-slate-50/70 rounded-2xl p-3.5 space-y-2.5 border-slate-200/80">
+          <p className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-1.5">
+            <Smartphone className="w-4 h-4 text-indigo-600" />
+            <span>Cài đặt PWA & Sao lưu dự phòng</span>
+          </p>
+          <p className="text-[11px] text-slate-600 leading-relaxed">
+            Trên iPhone / Safari: Bấm biểu tượng <strong>Chia sẻ (Share)</strong> rồi chọn <strong>Thêm vào MH chính (Add to Home Screen)</strong> để chạy toàn màn hình không có thanh địa chỉ và chống bị iOS dọn cache.
           </p>
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            <button type="button" onClick={onExportBackup} className="glass-pill px-3.5 py-2 rounded-xl text-xs font-medium text-emerald-200">
-              ⬇ Xuất file Backup (.json)
+            <button
+              type="button"
+              onClick={onExportBackup}
+              className="glass-pill px-3 py-1.5 rounded-xl text-xs font-medium text-emerald-800 hover:bg-emerald-50 flex items-center gap-1"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Xuất file Backup (.json)</span>
             </button>
-            <label className="glass-pill px-3.5 py-2 rounded-xl text-xs font-medium text-sky-200 cursor-pointer">
-              ⬆ Khôi phục từ file Backup
+            <label className="glass-pill px-3 py-1.5 rounded-xl text-xs font-medium text-sky-800 hover:bg-sky-50 cursor-pointer flex items-center gap-1">
+              <Upload className="w-3.5 h-3.5" />
+              <span>Khôi phục Backup</span>
               <input type="file" accept=".json" onChange={onRestoreBackup} className="hidden" />
             </label>
-            <button type="button" onClick={onResetProgress} className="glass-pill px-3.5 py-2 rounded-xl text-xs font-medium text-rose-300">
-              Đặt lại tiến độ học
+            <button
+              type="button"
+              onClick={onResetProgress}
+              className="glass-pill px-3 py-1.5 rounded-xl text-xs font-medium text-rose-700 hover:bg-rose-50 flex items-center gap-1"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Đặt lại tiến độ</span>
             </button>
           </div>
         </div>

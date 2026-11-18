@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { X, Copy, Check, Sparkles } from 'lucide-react';
 
 const STANDARD_PROMPT = `Hãy chuyển đổi tài liệu bài học dưới đây thành bộ Flashcard chuẩn JSON để nạp vào ứng dụng FlashCard MinMin.
 
@@ -35,37 +36,46 @@ export default function PromptModal({ isOpen, onClose, onCopySuccess }) {
     navigator.clipboard?.writeText(STANDARD_PROMPT).catch(() => {});
     setCopied(true);
     onCopySuccess();
+    setTimeout(() => setCopied(false), 2500);
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="glass-panel rounded-3xl max-w-2xl w-full p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-base sm:text-lg font-semibold text-white">Prompt chuẩn tạo Flashcard Đa Môn Học</h3>
-            <p className="text-xs text-slate-300">
-              Hỗ trợ tự động chọn loại thẻ: Định nghĩa (Basic), Điền khuyết &#123;&#123;c1::...&#125;&#125; (Cloze), và Ca lâm sàng (Case)
-            </p>
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
+      <div className="glass-panel bg-white/95 rounded-3xl max-w-2xl w-full p-4 sm:p-6 space-y-4 max-h-[92vh] overflow-y-auto shadow-2xl border border-white/90">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-amber-500" />
+            <div>
+              <h3 className="text-base sm:text-lg font-bold text-slate-800">Prompt AI tạo Flashcard Đa Môn</h3>
+              <p className="text-xs text-slate-500">
+                Tự động chọn loại thẻ: Định nghĩa (Basic), Điền khuyết (Cloze) và Ca lâm sàng (Case)
+              </p>
+            </div>
           </div>
-          <button type="button" onClick={onClose} className="glass-pill w-8 h-8 rounded-xl text-slate-300 hover:text-white">
-            ✕
+          <button
+            type="button"
+            onClick={onClose}
+            className="glass-pill w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 transition shrink-0"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <pre className="glass-input rounded-2xl p-4 text-xs text-slate-100 overflow-x-auto whitespace-pre-wrap leading-relaxed select-all">
+        <pre className="glass-input bg-slate-50 rounded-2xl p-3.5 text-xs text-slate-800 overflow-x-auto whitespace-pre-wrap leading-relaxed select-all border border-slate-200/80 font-mono">
           {STANDARD_PROMPT}
         </pre>
 
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs text-emerald-300">
-            {copied ? '✓ Đã sao chép! Hãy dán vào AI kèm nội dung bài học của bạn.' : ''}
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <span className="text-xs text-emerald-700 font-medium">
+            {copied ? '✓ Đã sao chép! Dán prompt này vào Gemini/ChatGPT kèm tài liệu.' : ''}
           </span>
           <button
             type="button"
             onClick={handleCopy}
-            className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs sm:text-sm"
+            className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs sm:text-sm shadow-sm transition active:scale-95 flex items-center gap-1.5"
           >
-            📋 Sao chép Prompt này
+            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            <span>{copied ? 'Đã sao chép!' : 'Sao chép Prompt này'}</span>
           </button>
         </div>
       </div>

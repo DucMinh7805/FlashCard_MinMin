@@ -310,7 +310,7 @@ export default function App() {
         prevQueue: activeSession.queue.slice(),
         prevReviewedCount: activeSession.reviewedCount,
       },
-    ]);
+    ].slice(-15));
 
     if (rating === 'red' && (!card.__repCount || card.__repCount < 2)) {
       const clone = { ...card, __repCount: (card.__repCount || 0) + 1 };
@@ -323,8 +323,8 @@ export default function App() {
     setProgressMap(nextProgressMap);
     safeSet(STORAGE_KEY_PROGRESS, nextProgressMap);
 
-    // Track daily review count for Streak & Analytics
-    const todayKey = new Date().toISOString().slice(0, 10);
+    // Track daily review count for Streak & Analytics (Local Timezone YYYY-MM-DD)
+    const todayKey = new Date().toLocaleDateString('sv-SE');
     const nextActivity = { ...activityLogs, [todayKey]: (activityLogs[todayKey] || 0) + 1 };
     setActivityLogs(nextActivity);
     safeSet(STORAGE_KEY_ACTIVITY, nextActivity);
@@ -358,8 +358,8 @@ export default function App() {
     setProgressMap(nextProgressMap);
     safeSet(STORAGE_KEY_PROGRESS, nextProgressMap);
 
-    // 2. Decrement today's activity review count
-    const todayKey = new Date().toISOString().slice(0, 10);
+    // 2. Decrement today's activity review count (Local Timezone YYYY-MM-DD)
+    const todayKey = new Date().toLocaleDateString('sv-SE');
     if (activityLogs[todayKey] && activityLogs[todayKey] > 0) {
       const nextActivity = { ...activityLogs, [todayKey]: Math.max(0, activityLogs[todayKey] - 1) };
       setActivityLogs(nextActivity);
@@ -426,7 +426,7 @@ export default function App() {
         id: `deck_${Date.now()}`,
         folderId: targetFolderId,
         name: deckName,
-        updatedAt: new Date().toISOString().slice(0, 10),
+        updatedAt: new Date().toLocaleDateString('sv-SE'),
         cards: parsed.cards,
       });
       showToast(`Đã tạo bộ thẻ "${deckName}" (${parsed.cards.length} thẻ)!`);

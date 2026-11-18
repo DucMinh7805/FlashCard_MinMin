@@ -4,7 +4,6 @@ export function getCardProgress(progressMap, cardId) {
 
 export function isCardDue(progressMap, cardId) {
   const p = getCardProgress(progressMap, cardId);
-  if (p.status !== 'green') return true;
   return Date.now() >= (p.dueDate || 0);
 }
 
@@ -51,7 +50,7 @@ export function calculateNextProgress(prevProg, rating) {
 
 export function computeStudyStreak(activityLogs = {}) {
   // activityLogs is an object: { 'YYYY-MM-DD': count }
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString('sv-SE');
   let streak = 0;
   let checkDate = new Date();
 
@@ -62,7 +61,7 @@ export function computeStudyStreak(activityLogs = {}) {
   }
 
   while (true) {
-    const key = checkDate.toISOString().slice(0, 10);
+    const key = checkDate.toLocaleDateString('sv-SE');
     if (activityLogs[key] && activityLogs[key] > 0) {
       streak++;
       checkDate.setDate(checkDate.getDate() - 1);

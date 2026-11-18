@@ -48,3 +48,29 @@ export function calculateNextProgress(prevProg, rating) {
     lastReviewed: now,
   };
 }
+
+export function computeStudyStreak(activityLogs = {}) {
+  // activityLogs is an object: { 'YYYY-MM-DD': count }
+  const today = new Date().toISOString().slice(0, 10);
+  let streak = 0;
+  let checkDate = new Date();
+
+  // If user hasn't studied today, check if they studied yesterday to keep streak alive
+  const todayCount = activityLogs[today] || 0;
+  if (!todayCount) {
+    checkDate.setDate(checkDate.getDate() - 1);
+  }
+
+  while (true) {
+    const key = checkDate.toISOString().slice(0, 10);
+    if (activityLogs[key] && activityLogs[key] > 0) {
+      streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  return { streak, todayCount };
+}
+

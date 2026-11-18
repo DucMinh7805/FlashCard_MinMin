@@ -23,6 +23,7 @@ export default function ImportModal({
   const handleClose = () => {
     setDeckName('');
     setRawText('');
+    setSelectedFolderId(currentFolderId || '');
     onClose();
   };
 

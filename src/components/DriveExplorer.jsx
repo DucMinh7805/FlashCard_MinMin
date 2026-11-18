@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Home,
   ChevronRight,
@@ -14,6 +14,10 @@ import {
   Folder,
 } from 'lucide-react';
 import { computeStatsForCards } from '../lib/spacedRepetition';
+
+function stripCloze(text) {
+  return (text || '').replace(/\{\{c\d+::(.*?)\}\}/g, '$1');
+}
 
 export default function DriveExplorer({
   appData,
@@ -34,6 +38,15 @@ export default function DriveExplorer({
 }) {
   const [openMenuFolderId, setOpenMenuFolderId] = useState(null);
   const [openMenuDeckId, setOpenMenuDeckId] = useState(null);
+
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setOpenMenuFolderId(null);
+      setOpenMenuDeckId(null);
+    };
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, []);
 
   const scopeDeckIds = getFolderRecursiveDeckIds(currentFolderId);
   const scopeCards = getCardsByDeckIds(scopeDeckIds);
@@ -139,15 +152,26 @@ export default function DriveExplorer({
           </button>
 
           {isAdmin && (
-            <button
-              type="button"
-              onClick={onNewFolder}
-              className="glass-pill p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1 transition"
-              title="Tạo thư mục con"
-            >
-              <FolderPlus className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden sm:inline">Thư mục</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={onNewDeck}
+                className="glass-pill p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1 transition"
+                title="Nạp bài học mới"
+              >
+                <Plus className="w-3.5 h-3.5 text-sky-600" />
+                <span className="hidden sm:inline">Nạp bài</span>
+              </button>
+              <button
+                type="button"
+                onClick={onNewFolder}
+                className="glass-pill p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl text-xs text-slate-600 hover:text-slate-900 flex items-center gap-1 transition"
+                title="Tạo thư mục con"
+              >
+                <FolderPlus className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="hidden sm:inline">Thư mục</span>
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -210,8 +234,8 @@ export default function DriveExplorer({
                     <p className="text-[11px] text-sky-700 font-medium truncate">
                       {item.folderPathStr} › {item.deck.name}
                     </p>
-                    <p className="text-sm text-slate-900 font-semibold mt-0.5 truncate">{item.card.front}</p>
-                    <p className="text-xs text-slate-600 mt-0.5 line-clamp-1">{item.card.back}</p>
+                    <p className="text-sm text-slate-900 font-semibold mt-0.5 truncate">{stripCloze(item.card.front)}</p>
+                    <p className="text-xs text-slate-600 mt-0.5 line-clamp-1">{stripCloze(item.card.back)}</p>
                   </div>
                   <span className="glass-pill px-2.5 py-1 rounded-lg text-xs font-semibold text-sky-700 shrink-0 flex items-center gap-1">
                     <span>Học bài này</span>
@@ -254,7 +278,9 @@ export default function DriveExplorer({
                         {folder.icon || '📁'}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-bold text-slate-800 text-sm line-clamp-2 leading-snug break-words">{folder.name}</h3>
+                        <h3 className="font-bold text-slate-800 text-sm line-clamp-2 leading-snug break-words" title={folder.name}>
+                          {folder.name}
+                        </h3>
                         <p className="text-[11px] text-slate-500 mt-0.5">
                           {subFolderCount > 0 ? `${subFolderCount} mục con • ` : ''}
                           {deckIds.length} bài • {st.total} thẻ
@@ -285,7 +311,7 @@ export default function DriveExplorer({
                               setOpenMenuFolderId(null);
                             }}
                           />
-                          <div className="absolute right-0 top-full mt-1.5 w-48 glass-panel bg-white/95 rounded-2xl p-1.5 z-50 shadow-xl border border-white/90 space-y-0.5">
+                          <div className="absolute right-0 top-full mt-1.5 w-52 bg-white/98 backdrop-blur-2xl rounded-2xl p-1.5 z-50 shadow-2xl border border-slate-200/90 space-y-0.5">
                             <button
                               type="button"
                               onClick={(e) => {
@@ -351,11 +377,23 @@ export default function DriveExplorer({
           <span className="text-xs text-slate-400 font-medium">{childDecks.length} bài học</span>
         </div>
         {childDecks.length === 0 ? (
-          <div className="glass-card rounded-2xl p-6 text-center space-y-2">
+          <div className="glass-card rounded-2xl p-6 text-center space-y-2.5">
             <p className="text-sm text-slate-700 font-medium">Thư mục này chưa có bộ thẻ bài học trực tiếp nào.</p>
             <p className="text-xs text-slate-500">
-              Bấm nút "＋ Thêm" ở thanh trên cùng để nạp bài học mới hoặc mở các thư mục con ở trên.
+              {isAdmin
+                ? 'Bấm nút bên dưới để thêm bài học mới hoặc mở các thư mục con ở trên.'
+                : 'Mở các thư mục môn con ở trên để học bài.'}
             </p>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={onNewDeck}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs shadow-sm transition active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Nạp bài học vào thư mục này</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -401,7 +439,7 @@ export default function DriveExplorer({
                               setOpenMenuDeckId(null);
                             }}
                           />
-                          <div className="absolute right-0 top-full mt-1.5 w-48 glass-panel bg-white/95 rounded-2xl p-1.5 z-50 shadow-xl border border-white/90 space-y-0.5">
+                          <div className="absolute right-0 top-full mt-1.5 w-52 bg-white/98 backdrop-blur-2xl rounded-2xl p-1.5 z-50 shadow-2xl border border-slate-200/90 space-y-0.5">
                             <button
                               type="button"
                               onClick={(e) => {

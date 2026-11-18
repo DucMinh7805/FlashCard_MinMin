@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Search, Plus, Settings, Sparkles, FolderPlus, BookPlus, Play, X } from 'lucide-react';
+import { Search, Plus, Settings, Sparkles, FolderPlus, BookPlus, Play, X, TrendingUp, Brain } from 'lucide-react';
 import { DEFAULT_DECKS, DEFAULT_FOLDERS } from './data/seedData';
 import { calculateNextProgress, getCardProgress, isCardDue } from './lib/spacedRepetition';
 import { DEFAULT_SUPABASE_KEY, DEFAULT_SUPABASE_URL, pullCloudData, pushCloudData } from './lib/supabase';
@@ -9,11 +9,14 @@ import ImportModal from './components/ImportModal';
 import PromptModal from './components/PromptModal';
 import EditorModal from './components/EditorModal';
 import SettingsModal from './components/SettingsModal';
+import AnalyticsModal from './components/AnalyticsModal';
+import ThesisDocsModal from './components/ThesisDocsModal';
 
 const STORAGE_KEY_CONTENT = 'minmin_flashcard_drive_v1';
 const STORAGE_KEY_PROGRESS = 'minmin_flashcard_progress_v1';
 const STORAGE_KEY_SESSION = 'minmin_flashcard_active_session_v1';
 const STORAGE_KEY_SETTINGS = 'minmin_flashcard_settings_v1';
+const STORAGE_KEY_ACTIVITY = 'minmin_flashcard_activity_v1';
 
 function safeGet(key, fallback) {
   try {
@@ -42,11 +45,13 @@ export default function App() {
   });
 
   const [progressMap, setProgressMap] = useState(() => safeGet(STORAGE_KEY_PROGRESS, {}));
+  const [activityLogs, setActivityLogs] = useState(() => safeGet(STORAGE_KEY_ACTIVITY, {}));
   const [settings, setSettings] = useState(() => {
     const saved = safeGet(STORAGE_KEY_SETTINGS, {});
     return {
-      isAdmin: true,
+      isAdmin: false, // Default to Guest/Student mode for safety on public & shared devices
       pin: '2309',
+      studentName: 'Học viên',
       ...saved,
       supabaseUrl: saved?.supabaseUrl || DEFAULT_SUPABASE_URL,
       supabaseKey: saved?.supabaseKey || DEFAULT_SUPABASE_KEY,
@@ -66,6 +71,8 @@ export default function App() {
 
   const [importOpen, setImportOpen] = useState(false);
   const [promptOpen, setPromptOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [thesisDocsOpen, setThesisDocsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editorMode, setEditorMode] = useState(null);
   const [toastMsg, setToastMsg] = useState('');
@@ -285,6 +292,12 @@ export default function App() {
     setProgressMap(nextProgressMap);
     safeSet(STORAGE_KEY_PROGRESS, nextProgressMap);
 
+    // Track daily review count for Streak & Analytics
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const nextActivity = { ...activityLogs, [todayKey]: (activityLogs[todayKey] || 0) + 1 };
+    setActivityLogs(nextActivity);
+    safeSet(STORAGE_KEY_ACTIVITY, nextActivity);
+
     const nextIndex = activeSession.currentIndex + 1;
     const nextSession = {
       ...activeSession,
@@ -332,7 +345,8 @@ export default function App() {
     let nextFolders = appData.folders.slice();
     let targetFolderId = selectedFolderId;
 
-    if (parsed.folderPath?.length > 0) {
+    // Only auto-resolve folderPath from JSON if user hasn't explicitly selected a specific folder
+    if (!selectedFolderId && parsed.folderPath?.length > 0) {
       let parentId = null;
       for (const rawName of parsed.folderPath) {
         const name = String(rawName || '').trim();
@@ -414,11 +428,38 @@ export default function App() {
                   }`}
                   title={settings.supabaseUrl ? 'Cloud Supabase đã kết nối' : 'Kho dữ liệu Local'}
                 />
+                {settings.isAdmin ? (
+                  <span className="hidden sm:inline px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                    Admin
+                  </span>
+                ) : (
+                  <span className="hidden sm:inline px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium truncate max-w-[80px]">
+                    {settings.studentName || 'Học viên'}
+                  </span>
+                )}
               </div>
             </button>
 
-            {/* Right Actions: Search + Plus Dropdown + Settings */}
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Right Actions: Analytics + Thesis Docs + Search + Plus Dropdown + Settings */}
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <button
+                type="button"
+                onClick={() => setAnalyticsOpen(true)}
+                className="glass-pill w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-slate-600 hover:text-slate-900 flex items-center justify-center transition"
+                title="Thống kê học tập & Streak"
+              >
+                <TrendingUp className="w-4 h-4 text-emerald-600" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setThesisDocsOpen(true)}
+                className="glass-pill w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-slate-600 hover:text-slate-900 flex items-center justify-center transition"
+                title="Kiến trúc Đồ án & Thuật toán Spaced Repetition"
+              >
+                <Brain className="w-4 h-4 text-indigo-600" />
+              </button>
+
               <button
                 type="button"
                 onClick={() => setShowSearch((v) => !v)}
@@ -445,7 +486,7 @@ export default function App() {
                 {plusMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setPlusMenuOpen(false)} />
-                    <div className="absolute right-0 top-full mt-2 w-52 glass-panel bg-white/95 rounded-2xl p-1.5 z-50 shadow-xl space-y-0.5 border border-white/90">
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white/98 backdrop-blur-2xl rounded-2xl p-1.5 z-50 shadow-2xl space-y-0.5 border border-slate-200/90">
                       <button
                         type="button"
                         onClick={() => {
@@ -480,6 +521,29 @@ export default function App() {
                       >
                         <Sparkles className="w-4 h-4 text-amber-500" />
                         <span>Prompt tạo thẻ AI</span>
+                      </button>
+                      <div className="border-t border-slate-100 my-1" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPlusMenuOpen(false);
+                          setAnalyticsOpen(true);
+                        }}
+                        className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
+                      >
+                        <TrendingUp className="w-4 h-4 text-emerald-600" />
+                        <span>Thống kê & Streak học</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPlusMenuOpen(false);
+                          setThesisDocsOpen(true);
+                        }}
+                        className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
+                      >
+                        <Brain className="w-4 h-4 text-indigo-600" />
+                        <span>Kiến trúc Đồ án & Thuật toán</span>
                       </button>
                     </div>
                   </>
@@ -536,7 +600,7 @@ export default function App() {
               <div>
                 <p className="text-[11px] uppercase tracking-wider text-sky-600 font-semibold">Phiên học đang dở</p>
                 <p className="text-sm text-slate-800 font-medium">
-                  {resumeCandidate.title} — Thẻ {resumeCandidate.currentIndex + 1} / {resumeCandidate.queue.length}
+                  {resumeCandidate.title} — Còn {Math.max(1, resumeCandidate.queue.length - resumeCandidate.currentIndex)} lượt thẻ trong phiên (Đã học {resumeCandidate.reviewedCount || resumeCandidate.currentIndex} lượt)
                 </p>
               </div>
             </div>
@@ -724,6 +788,60 @@ export default function App() {
           };
           reader.readAsText(file, 'utf-8');
         }}
+        onExportUserProgress={() => {
+          const blob = new Blob(
+            [
+              JSON.stringify(
+                {
+                  type: 'minmin_user_progress',
+                  studentName: settings.studentName || 'Học viên',
+                  exportedAt: new Date().toISOString(),
+                  progressMap,
+                  activityLogs,
+                },
+                null,
+                2
+              ),
+            ],
+            { type: 'application/json' }
+          );
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `MinMin_TienDoHoc_${(settings.studentName || 'HocVien').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+          showToast('Đã tải xuống file tiến độ học tập cá nhân!');
+        }}
+        onRestoreUserProgress={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const parsed = JSON.parse(String(reader.result || '{}'));
+              if (parsed.progressMap) {
+                const merged = { ...progressMap, ...parsed.progressMap };
+                setProgressMap(merged);
+                safeSet(STORAGE_KEY_PROGRESS, merged);
+              }
+              if (parsed.activityLogs) {
+                const mergedLogs = { ...activityLogs, ...parsed.activityLogs };
+                setActivityLogs(mergedLogs);
+                safeSet(STORAGE_KEY_ACTIVITY, mergedLogs);
+              }
+              if (parsed.studentName) {
+                const next = { ...settings, studentName: parsed.studentName };
+                setSettings(next);
+                safeSet(STORAGE_KEY_SETTINGS, next);
+              }
+              showToast(`Đã đồng bộ tiến độ học của "${parsed.studentName || 'Học viên'}"!`);
+            } catch {
+              showToast('File tiến độ không đúng định dạng JSON.');
+            }
+          };
+          reader.readAsText(file, 'utf-8');
+        }}
         onResetProgress={() => {
           setProgressMap({});
           localStorage.removeItem(STORAGE_KEY_PROGRESS);
@@ -731,6 +849,22 @@ export default function App() {
           setResumeCandidate(null);
           showToast('Đã đặt lại toàn bộ tiến độ về Chưa nhớ.');
         }}
+      />
+
+      <AnalyticsModal
+        isOpen={analyticsOpen}
+        onClose={() => setAnalyticsOpen(false)}
+        appData={appData}
+        progressMap={progressMap}
+        activityLogs={activityLogs}
+        getFolderRecursiveDeckIds={getFolderRecursiveDeckIds}
+        getCardsByDeckIds={getCardsByDeckIds}
+        onStartStudy={startStudySession}
+      />
+
+      <ThesisDocsModal
+        isOpen={thesisDocsOpen}
+        onClose={() => setThesisDocsOpen(false)}
       />
 
       {toastMsg && (

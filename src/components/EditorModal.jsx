@@ -29,7 +29,7 @@ export default function EditorModal({ mode, card, onClose, onSaveFolder, onSaveC
   if (!mode) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
+    <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
       <div className="glass-panel bg-white/95 rounded-3xl max-w-lg w-full p-4 sm:p-6 space-y-4 shadow-2xl border border-white/90 max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">

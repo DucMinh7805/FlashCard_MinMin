@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Upload, FileText, CheckCircle2 } from 'lucide-react';
+import { X, Upload, FileText, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { parseImportInput } from '../lib/importParser';
 
 export default function ImportModal({
@@ -115,20 +115,35 @@ export default function ImportModal({
           />
         </div>
 
-        <div className="glass-card bg-slate-50/80 rounded-2xl p-3 text-xs text-slate-700 border-slate-200/80">
-          <p className="font-medium flex items-center gap-1.5 text-sky-800">
-            {parsed.cards.length > 0 ? (
-              <>
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>
-                  Nhận diện hợp lệ <strong>{parsed.cards.length} thẻ</strong> ({clozeCount} Cloze, {caseCount} Case). Thẻ trùng câu hỏi sẽ giữ nguyên tiến độ cũ.
-                </span>
-              </>
-            ) : (
-              <span>Hãy dán nội dung hoặc chọn file để xem trước số thẻ...</span>
-            )}
-          </p>
-        </div>
+        {parsed.isJsonError ? (
+          <div className="glass-card bg-rose-50/90 rounded-2xl p-3 text-xs text-rose-800 border border-rose-300 shadow-sm flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold text-rose-700">Lỗi cú pháp JSON phát hiện:</p>
+              <p className="font-mono text-[11px] text-rose-800 bg-white/70 px-2 py-1 rounded-lg border border-rose-200 break-all">
+                {parsed.error}
+              </p>
+              <p className="text-[11px] text-rose-600">
+                Hệ thống đã chặn nạp tự động để tránh cắt sai dữ liệu thành các thẻ hỏng. Vui lòng kiểm tra lại cấu trúc JSON hoặc dấu phẩy thừa.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="glass-card bg-slate-50/80 rounded-2xl p-3 text-xs text-slate-700 border-slate-200/80">
+            <p className="font-medium flex items-center gap-1.5 text-sky-800">
+              {parsed.cards.length > 0 ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>
+                    Nhận diện hợp lệ <strong>{parsed.cards.length} thẻ</strong> ({clozeCount} Cloze, {caseCount} Case). Thẻ trùng câu hỏi sẽ giữ nguyên tiến độ cũ.
+                  </span>
+                </>
+              ) : (
+                <span>Hãy dán nội dung hoặc chọn file để xem trước số thẻ...</span>
+              )}
+            </p>
+          </div>
+        )}
 
         <div className="flex items-center justify-end gap-2 pt-2">
           <button
@@ -140,7 +155,9 @@ export default function ImportModal({
           </button>
           <button
             type="button"
+            disabled={parsed.cards.length === 0 || parsed.isJsonError}
             onClick={() => {
+              if (parsed.cards.length === 0 || parsed.isJsonError) return;
               onConfirmImport({
                 parsed,
                 selectedFolderId: selectedFolderId || null,
@@ -149,7 +166,11 @@ export default function ImportModal({
               setRawText('');
               setDeckName('');
             }}
-            className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs sm:text-sm shadow-sm transition active:scale-95"
+            className={`px-4 py-2 rounded-xl font-semibold text-xs sm:text-sm shadow-sm transition active:scale-95 ${
+              parsed.cards.length === 0 || parsed.isJsonError
+                ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                : 'bg-sky-500 hover:bg-sky-400 text-white'
+            }`}
           >
             Lưu & Nạp vào Thư mục
           </button>

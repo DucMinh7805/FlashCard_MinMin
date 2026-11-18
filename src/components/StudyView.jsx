@@ -12,6 +12,8 @@ import {
   Layers,
   Sparkles,
   SlidersHorizontal,
+  ImageOff,
+  ZoomIn,
 } from 'lucide-react';
 import { computeStatsForCards, getCardProgress } from '../lib/spacedRepetition';
 
@@ -55,12 +57,27 @@ export default function StudyView({
   onRestartSession,
 }) {
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const [lightboxImg, setLightboxImg] = useState(null);
 
   const allSessionCards = getCardsByDeckIds(session.deckIds);
   const st = computeStatsForCards(allSessionCards, progressMap);
   const isComplete = session.currentIndex >= session.queue.length;
   const card = !isComplete ? session.queue[session.currentIndex] : null;
   const prog = card ? getCardProgress(progressMap, card.id) : null;
+
+  useEffect(() => {
+    setImgError(false);
+  }, [card?.id]);
+
+  useEffect(() => {
+    if (!lightboxImg) return;
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') setLightboxImg(null);
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [lightboxImg]);
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -112,8 +129,10 @@ export default function StudyView({
     bg: 'bg-sky-100 text-sky-700 border-sky-200',
   };
 
+  const isCaseOrLong = card?.type === 'case' || (card?.front && card.front.length > 80);
+
   return (
-    <section className="space-y-3 pb-28">
+    <section className="space-y-3 pb-36 sm:pb-40">
       {/* Top Study Bar: 1 unified bar with counter, title, actions, and integrated 3px progress line */}
       <div className="relative glass-panel rounded-2xl px-3 sm:px-4 py-2 shadow-sm border border-white/90 overflow-hidden">
         <div className="flex items-center justify-between gap-2">
@@ -200,18 +219,26 @@ export default function StudyView({
           </div>
 
           {/* Card Scrollable Content Area */}
-          <div className="my-auto py-5 space-y-4 text-center max-h-[calc(100vh-270px)] overflow-y-auto px-1 pr-1.5">
-            <div className="space-y-2">
+          <div className="my-auto py-5 space-y-4 max-h-[calc(100vh-230px)] overflow-y-auto px-1 pr-1.5">
+            <div className={`space-y-2 ${isCaseOrLong ? 'text-left' : 'text-center'}`}>
               <p className="text-[11px] uppercase tracking-widest text-sky-600 font-bold">
                 {card.type === 'cloze'
                   ? session.isFlipped
                     ? 'Mặt trước • Đã điền khuyết'
                     : 'Mặt trước • Điền vào chỗ trống [...]'
-                  : useReverse
-                    ? 'Chiều ngược • Đáp án → Đoán thuật ngữ'
-                    : 'Mặt trước • Thuật ngữ / Câu hỏi'}
+                  : card.type === 'case'
+                    ? 'Mặt trước • Tình huống lâm sàng (Case Study)'
+                    : useReverse
+                      ? 'Chiều ngược • Đáp án → Đoán thuật ngữ'
+                      : 'Mặt trước • Thuật ngữ / Câu hỏi'}
               </p>
-              <div className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 leading-relaxed whitespace-pre-line">
+              <div
+                className={`${
+                  isCaseOrLong
+                    ? 'text-left text-base sm:text-lg md:text-xl font-semibold text-slate-900 leading-relaxed bg-slate-50/70 p-3.5 sm:p-4 rounded-2xl border border-slate-200/70 shadow-sm'
+                    : 'text-center text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 leading-relaxed'
+                } whitespace-pre-line`}
+              >
                 {card.type === 'cloze'
                   ? formatClozeParts(card.front, session.isFlipped)
                   : useReverse
@@ -221,12 +248,33 @@ export default function StudyView({
             </div>
 
             {card.image && card.image.trim() && (
-              <div className="max-w-md mx-auto pt-2">
-                <img
-                  src={card.image.trim()}
-                  alt="Card illustration"
-                  className="max-h-52 mx-auto rounded-2xl border border-slate-200/80 shadow-md object-contain"
-                />
+              <div className="max-w-md mx-auto pt-2 text-center">
+                {imgError ? (
+                  <div className="glass-card rounded-2xl p-3 bg-slate-50 text-xs text-slate-500 border border-slate-200 flex items-center justify-center gap-2">
+                    <ImageOff className="w-4 h-4 text-slate-400 shrink-0" />
+                    <span>Không tải được ảnh minh họa</span>
+                  </div>
+                ) : (
+                  <div
+                    className="relative inline-block group cursor-zoom-in"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLightboxImg(card.image.trim());
+                    }}
+                    title="Bấm để phóng to ảnh xem chi tiết"
+                  >
+                    <img
+                      src={card.image.trim()}
+                      alt="Minh họa bài học"
+                      onError={() => setImgError(true)}
+                      className="max-h-56 mx-auto rounded-2xl border border-slate-200/80 shadow-md object-contain hover:brightness-95 transition"
+                    />
+                    <div className="absolute bottom-2 right-2 glass-pill bg-white/90 px-2 py-0.5 rounded-lg text-[10px] text-slate-700 font-semibold shadow flex items-center gap-1 opacity-80 group-hover:opacity-100 transition">
+                      <ZoomIn className="w-3 h-3 text-sky-600" />
+                      <span>Phóng to</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -501,6 +549,31 @@ export default function StudyView({
             >
               Xong
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Zoom Overlay for Medical & Anatomical Images */}
+      {lightboxImg && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
+          onClick={() => setLightboxImg(null)}
+        >
+          <div className="relative max-w-4xl max-h-[92vh] flex flex-col items-center">
+            <button
+              type="button"
+              onClick={() => setLightboxImg(null)}
+              className="absolute -top-11 right-0 sm:-right-2 glass-pill bg-white/95 hover:bg-white text-slate-800 px-3 py-1.5 rounded-2xl shadow-xl flex items-center gap-1.5 text-xs font-bold transition active:scale-95"
+            >
+              <X className="w-4 h-4" />
+              <span>Đóng (Esc)</span>
+            </button>
+            <img
+              src={lightboxImg}
+              alt="Minh họa chi tiết"
+              onClick={(e) => e.stopPropagation()}
+              className="max-h-[85vh] max-w-full rounded-2xl shadow-2xl border border-white/20 object-contain select-none"
+            />
           </div>
         </div>
       )}

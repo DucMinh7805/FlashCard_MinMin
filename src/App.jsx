@@ -35,10 +35,55 @@ function safeSet(key, val) {
   }
 }
 
+function getAllDescendantFolderIds(rootFolderId, allFolders) {
+  const ids = new Set([rootFolderId]);
+  let added = true;
+  while (added) {
+    added = false;
+    for (const f of allFolders) {
+      if (f.parentId && ids.has(f.parentId) && !ids.has(f.id)) {
+        ids.add(f.id);
+        added = true;
+      }
+    }
+  }
+  return ids;
+}
+
 export default function App() {
   const [appData, setAppData] = useState(() => {
     const saved = safeGet(STORAGE_KEY_CONTENT, null);
-    if (saved?.folders && saved?.decks) return saved;
+    if (saved?.folders && saved?.decks) {
+      // Migrate old hierarchy (fld_ykhoa as parent) to pragmatic clinical root folders
+      const hasOldYkhoa = saved.folders.some((f) => f.id === 'fld_ykhoa');
+      if (hasOldYkhoa) {
+        let updatedFolders = saved.folders
+          .filter((f) => f.id !== 'fld_ykhoa')
+          .map((f) => {
+            if (f.parentId === 'fld_ykhoa') return { ...f, parentId: null };
+            if (f.id === 'fld_avcn' && (f.icon === '🇬🇧' || !f.icon)) return { ...f, icon: '🌐' };
+            return f;
+          });
+        if (!updatedFolders.some((f) => f.id === 'fld_yhcs')) {
+          const insertIdx = updatedFolders.findIndex((f) => f.id === 'fld_avcn');
+          const yhcsFolder = {
+            id: 'fld_yhcs',
+            name: 'Y học cơ sở (Giải phẫu, Sinh lý, Dược lý...)',
+            icon: '🧬',
+            parentId: null,
+          };
+          if (insertIdx >= 0) {
+            updatedFolders.splice(insertIdx, 0, yhcsFolder);
+          } else {
+            updatedFolders.push(yhcsFolder);
+          }
+        }
+        const migrated = { ...saved, folders: updatedFolders };
+        safeSet(STORAGE_KEY_CONTENT, migrated);
+        return migrated;
+      }
+      return saved;
+    }
     const initial = { folders: DEFAULT_FOLDERS, decks: DEFAULT_DECKS };
     safeSet(STORAGE_KEY_CONTENT, initial);
     return initial;
@@ -643,15 +688,67 @@ export default function App() {
             onNewFolder={() => (settings.isAdmin ? setEditorMode('new_folder') : showToast('Cần mở khóa PIN Chủ sở hữu.'))}
             onNewDeck={() => (settings.isAdmin ? setImportOpen(true) : showToast('Cần mở khóa PIN Chủ sở hữu.'))}
             onDeleteFolder={(fid) => {
-              persistAndSyncContent({
-                folders: appData.folders.filter((f) => f.id !== fid && f.parentId !== fid),
-                decks: appData.decks.filter((d) => d.folderId !== fid),
-              });
-              showToast('Đã xóa thư mục.');
+              const descendantIds = getAllDescendantFolderIds(fid, appData.folders);
+              const decksToDelete = appData.decks.filter((d) => descendantIds.has(d.folderId));
+              const cardIdsToDelete = new Set(decksToDelete.flatMap((d) => (d.cards || []).map((c) => c.id)));
+
+              // Clean orphaned progress in progressMap
+              let nextProgressMap = { ...progressMap };
+              let cleanedAny = false;
+              for (const cid of cardIdsToDelete) {
+                if (nextProgressMap[cid]) {
+                  delete nextProgressMap[cid];
+                  cleanedAny = true;
+                }
+              }
+              if (cleanedAny) {
+                setProgressMap(nextProgressMap);
+                safeSet(STORAGE_KEY_PROGRESS, nextProgressMap);
+              }
+
+              // Reset current folder if inside deleted tree
+              if (descendantIds.has(currentFolderId)) {
+                setCurrentFolderId(null);
+              }
+
+              // Clear active session / resume candidate if affected
+              const deletedDeckIds = new Set(decksToDelete.map((d) => d.id));
+              if (resumeCandidate?.deckIds?.some((id) => deletedDeckIds.has(id))) {
+                localStorage.removeItem(STORAGE_KEY_SESSION);
+                setResumeCandidate(null);
+              }
+
+              const nextFolders = appData.folders.filter((f) => !descendantIds.has(f.id));
+              const nextDecks = appData.decks.filter((d) => !descendantIds.has(d.folderId));
+              persistAndSyncContent({ folders: nextFolders, decks: nextDecks });
+              showToast(`Đã xóa thư mục cùng ${decksToDelete.length} bài học liên quan.`);
             }}
             onDeleteDeck={(did) => {
-              persistAndSyncContent({ ...appData, decks: appData.decks.filter((d) => d.id !== did) });
-              showToast('Đã xóa bộ thẻ.');
+              const targetDeck = appData.decks.find((d) => d.id === did);
+              const cardIdsToDelete = new Set((targetDeck?.cards || []).map((c) => c.id));
+
+              // Clean orphaned progress in progressMap
+              let nextProgressMap = { ...progressMap };
+              let cleanedAny = false;
+              for (const cid of cardIdsToDelete) {
+                if (nextProgressMap[cid]) {
+                  delete nextProgressMap[cid];
+                  cleanedAny = true;
+                }
+              }
+              if (cleanedAny) {
+                setProgressMap(nextProgressMap);
+                safeSet(STORAGE_KEY_PROGRESS, nextProgressMap);
+              }
+
+              if (resumeCandidate?.deckIds?.includes(did)) {
+                localStorage.removeItem(STORAGE_KEY_SESSION);
+                setResumeCandidate(null);
+              }
+
+              const nextDecks = appData.decks.filter((d) => d.id !== did);
+              persistAndSyncContent({ ...appData, decks: nextDecks });
+              showToast(`Đã xóa bộ thẻ "${targetDeck?.name || ''}".`);
             }}
             onShareLink={(hash, msg) => {
               navigator.clipboard?.writeText(window.location.origin + window.location.pathname + hash).catch(() => {});
@@ -891,7 +988,7 @@ export default function App() {
       />
 
       {toastMsg && (
-        <div className="fixed bottom-5 right-5 z-50 bg-slate-900/90 text-white rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-medium shadow-2xl border border-white/20 backdrop-blur-md">
+        <div className="fixed bottom-5 right-5 z-50 bg-slate-900/90 text-white rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-medium shadow-2xl border border-white/20 backdrop-blur-md max-w-[90vw] sm:max-w-md line-clamp-2 break-words">
           {toastMsg}
         </div>
       )}

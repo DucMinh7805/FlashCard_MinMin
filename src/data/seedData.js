@@ -1,10 +1,10 @@
 export const DEFAULT_FOLDERS = [
-  { id: 'fld_ykhoa', name: 'Y khoa lâm sàng', icon: '🩺', parentId: null },
-  { id: 'fld_noi', name: 'Nội khoa', icon: '🫀', parentId: 'fld_ykhoa' },
-  { id: 'fld_ngoai', name: 'Ngoại khoa', icon: '🔪', parentId: 'fld_ykhoa' },
-  { id: 'fld_san', name: 'Sản phụ khoa', icon: '🤰', parentId: 'fld_ykhoa' },
-  { id: 'fld_nhi', name: 'Nhi khoa', icon: '👶', parentId: 'fld_ykhoa' },
-  { id: 'fld_avcn', name: 'Anh văn chuyên ngành (AVCN)', icon: '🇬🇧', parentId: null },
+  { id: 'fld_noi', name: 'Nội khoa', icon: '🫀', parentId: null },
+  { id: 'fld_ngoai', name: 'Ngoại khoa', icon: '🔪', parentId: null },
+  { id: 'fld_san', name: 'Sản phụ khoa', icon: '🤰', parentId: null },
+  { id: 'fld_nhi', name: 'Nhi khoa', icon: '👶', parentId: null },
+  { id: 'fld_yhcs', name: 'Y học cơ sở (Giải phẫu, Sinh lý, Dược lý...)', icon: '🧬', parentId: null },
+  { id: 'fld_avcn', name: 'Anh văn chuyên ngành (AVCN)', icon: '🌐', parentId: null },
   { id: 'fld_avcn_cdha', name: 'Chẩn đoán hình ảnh', icon: '🩻', parentId: 'fld_avcn' },
   { id: 'fld_khac', name: 'Môn học & Kỹ năng khác', icon: '📚', parentId: null },
 ];

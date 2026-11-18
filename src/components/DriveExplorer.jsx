@@ -14,6 +14,7 @@ import {
   Folder,
 } from 'lucide-react';
 import { computeStatsForCards } from '../lib/spacedRepetition';
+import ConfirmModal from './ConfirmModal';
 
 function stripCloze(text) {
   return (text || '').replace(/\{\{c\d+::(.*?)\}\}/g, '$1');
@@ -38,6 +39,7 @@ export default function DriveExplorer({
 }) {
   const [openMenuFolderId, setOpenMenuFolderId] = useState(null);
   const [openMenuDeckId, setOpenMenuDeckId] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   useEffect(() => {
     const handleOutsideClick = () => {
@@ -271,7 +273,7 @@ export default function DriveExplorer({
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Thư mục môn / chuyên khoa
+              Học phần / Môn học
             </h2>
             <span className="text-xs text-slate-400 font-medium">{childFolders.length} thư mục</span>
           </div>
@@ -350,9 +352,7 @@ export default function DriveExplorer({
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setOpenMenuFolderId(null);
-                                  if (window.confirm(`Xác nhận xóa thư mục "${folder.name}" cùng các bài học bên trong?`)) {
-                                    onDeleteFolder(folder.id);
-                                  }
+                                  setConfirmDelete({ type: 'folder', id: folder.id, name: folder.name });
                                 }}
                                 className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center gap-2"
                               >
@@ -406,179 +406,202 @@ export default function DriveExplorer({
         </div>
       )}
 
-      {/* Decks Grid */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-            Bộ thẻ bài học (Decks)
-          </h2>
-          <span className="text-xs text-slate-400 font-medium">{childDecks.length} bài học</span>
-        </div>
-        {childDecks.length === 0 ? (
-          <div className="glass-card rounded-2xl p-6 text-center space-y-2.5">
-            <p className="text-sm text-slate-700 font-medium">Thư mục này chưa có bộ thẻ bài học trực tiếp nào.</p>
-            <p className="text-xs text-slate-500">
-              {isAdmin
-                ? 'Bấm nút bên dưới để thêm bài học mới hoặc mở các thư mục con ở trên.'
-                : 'Mở các thư mục môn con ở trên để học bài.'}
-            </p>
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={onNewDeck}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs shadow-sm transition active:scale-95"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Nạp bài học vào thư mục này</span>
-              </button>
-            )}
+      {/* Decks Grid - Only displayed if decks exist, or if this is an empty leaf folder */}
+      {(childDecks.length > 0 || childFolders.length === 0) && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Bộ thẻ bài học (Decks)
+            </h2>
+            <span className="text-xs text-slate-400 font-medium">{childDecks.length} bài học</span>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {childDecks.map((deck) => {
-              const st = computeStatsForCards(deck.cards, progressMap);
-              const isMenuOpen = openMenuDeckId === deck.id;
-
-              return (
-                <div
-                  key={deck.id}
-                  className={`glass-card rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between gap-3 shadow-sm hover:border-sky-300 transition ${
-                    isMenuOpen ? 'relative z-40' : 'relative z-10'
-                  }`}
+          {childDecks.length === 0 ? (
+            <div className="glass-card rounded-2xl p-6 text-center space-y-2.5">
+              <p className="text-sm text-slate-700 font-medium">Thư mục này chưa có bộ thẻ bài học trực tiếp nào.</p>
+              <p className="text-xs text-slate-500">
+                {isAdmin
+                  ? 'Bấm nút bên dưới để nạp bài học mới.'
+                  : 'Chưa có bài học nào trong thư mục này.'}
+              </p>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={onNewDeck}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs shadow-sm transition active:scale-95"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <BookOpen className="w-4 h-4 text-sky-600 shrink-0" />
-                        <h3 className="font-bold text-slate-800 text-sm sm:text-base line-clamp-2 leading-snug break-words">{deck.name}</h3>
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Nạp bài học vào thư mục này</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {childDecks.map((deck) => {
+                const st = computeStatsForCards(deck.cards, progressMap);
+                const isMenuOpen = openMenuDeckId === deck.id;
+
+                return (
+                  <div
+                    key={deck.id}
+                    className={`glass-card rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between gap-3 shadow-sm hover:border-sky-300 transition ${
+                      isMenuOpen ? 'relative z-40' : 'relative z-10'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="w-4 h-4 text-sky-600 shrink-0" />
+                          <h3 className="font-bold text-slate-800 text-sm sm:text-base line-clamp-2 leading-snug break-words">{deck.name}</h3>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {st.total} thẻ • <span className="text-rose-600 font-medium">{st.red} Đỏ</span> •{' '}
+                          <span className="text-amber-600 font-medium">{st.yellow} Vàng</span> •{' '}
+                          <span className="text-emerald-600 font-medium">{st.green} Xanh</span>
+                        </p>
                       </div>
-                      <p className="text-xs text-slate-500 mt-1">
-                        {st.total} thẻ • <span className="text-rose-600 font-medium">{st.red} Đỏ</span> •{' '}
-                        <span className="text-amber-600 font-medium">{st.yellow} Vàng</span> •{' '}
-                        <span className="text-emerald-600 font-medium">{st.green} Xanh</span>
-                      </p>
-                    </div>
 
-                    {/* Single 3-dot Action Menu button to prevent misclicks */}
-                    <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenMenuDeckId(isMenuOpen ? null : deck.id);
-                        }}
-                        className="glass-pill w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 transition active:scale-95"
-                        title="Tùy chọn bài học"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
+                      {/* Single 3-dot Action Menu button to prevent misclicks */}
+                      <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuDeckId(isMenuOpen ? null : deck.id);
+                          }}
+                          className="glass-pill w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 transition active:scale-95"
+                          title="Tùy chọn bài học"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
 
-                      {isMenuOpen && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-40"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenMenuDeckId(null);
-                            }}
-                          />
-                          <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-2xl p-1.5 z-50 shadow-2xl border border-slate-200 space-y-0.5">
-                            <button
-                              type="button"
+                        {isMenuOpen && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-40"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setOpenMenuDeckId(null);
-                                onShareLink(`#deck=${deck.id}`, `Đã copy link chia sẻ bài "${deck.name}"`);
                               }}
-                              className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
-                            >
-                              <Share2 className="w-3.5 h-3.5 text-sky-600" />
-                              <span>Sao chép link chia sẻ</span>
-                            </button>
-                            {isAdmin && (
+                            />
+                            <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-2xl p-1.5 z-50 shadow-2xl border border-slate-200 space-y-0.5">
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setOpenMenuDeckId(null);
-                                  if (window.confirm(`Xác nhận xóa bộ thẻ bài học "${deck.name}"?`)) {
-                                    onDeleteDeck(deck.id);
-                                  }
+                                  onShareLink(`#deck=${deck.id}`, `Đã copy link chia sẻ bài "${deck.name}"`);
                                 }}
-                                className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center gap-2"
+                                className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
                               >
-                                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                                <span>Xóa bài học này</span>
+                                <Share2 className="w-3.5 h-3.5 text-sky-600" />
+                                <span>Sao chép link chia sẻ</span>
                               </button>
-                            )}
-                          </div>
-                        </>
+                              {isAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenMenuDeckId(null);
+                                    setConfirmDelete({ type: 'deck', id: deck.id, name: deck.name });
+                                  }}
+                                  className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center gap-2"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                  <span>Xóa bài học này</span>
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="w-full h-1.5 rounded-full bg-slate-200/80 overflow-hidden flex shadow-inner">
+                      {st.total > 0 && st.red > 0 && (
+                        <div
+                          className="bg-rose-500 h-full shrink-0"
+                          style={{ width: `${(st.red / st.total) * 100}%` }}
+                          title={`Chưa nhớ: ${st.red}`}
+                        />
+                      )}
+                      {st.total > 0 && st.yellow > 0 && (
+                        <div
+                          className="bg-amber-400 h-full shrink-0"
+                          style={{ width: `${(st.yellow / st.total) * 100}%` }}
+                          title={`Tạm hiểu: ${st.yellow}`}
+                        />
+                      )}
+                      {st.total > 0 && st.green > 0 && (
+                        <div
+                          className="bg-emerald-500 h-full shrink-0"
+                          style={{ width: `${(st.green / st.total) * 100}%` }}
+                          title={`Đã thuộc: ${st.green}`}
+                        />
                       )}
                     </div>
-                  </div>
 
-                  {/* Progress bar */}
-                  <div className="w-full h-1.5 rounded-full bg-slate-200/80 overflow-hidden flex shadow-inner">
-                    {st.total > 0 && st.red > 0 && (
-                      <div
-                        className="bg-rose-500 h-full shrink-0"
-                        style={{ width: `${(st.red / st.total) * 100}%` }}
-                        title={`Chưa nhớ: ${st.red}`}
-                      />
-                    )}
-                    {st.total > 0 && st.yellow > 0 && (
-                      <div
-                        className="bg-amber-400 h-full shrink-0"
-                        style={{ width: `${(st.yellow / st.total) * 100}%` }}
-                        title={`Tạm hiểu: ${st.yellow}`}
-                      />
-                    )}
-                    {st.total > 0 && st.green > 0 && (
-                      <div
-                        className="bg-emerald-500 h-full shrink-0"
-                        style={{ width: `${(st.green / st.total) * 100}%` }}
-                        title={`Đã thuộc: ${st.green}`}
-                      />
-                    )}
-                  </div>
-
-                  {/* Bottom Action buttons */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
-                    <span className="text-[11px] text-slate-500">
-                      Cần ôn: <strong className="text-slate-800 font-bold">{st.due} thẻ</strong>
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      {st.red + st.yellow > 0 && (
+                    {/* Bottom Action buttons */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                      <span className="text-[11px] text-slate-500">
+                        Cần ôn: <strong className="text-slate-800 font-bold">{st.due} thẻ</strong>
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {st.red + st.yellow > 0 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onStartStudy({
+                                title: deck.name,
+                                deckIds: [deck.id],
+                                filterMode: 'red_yellow',
+                              })
+                            }
+                            className="px-2.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-800 hover:bg-amber-100 font-medium text-xs transition"
+                          >
+                            Chưa thuộc ({st.red + st.yellow})
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() =>
-                            onStartStudy({
-                              title: deck.name,
-                              deckIds: [deck.id],
-                              filterMode: 'red_yellow',
-                            })
-                          }
-                          className="px-2.5 py-1.5 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-800 hover:bg-amber-100 font-medium text-xs transition"
+                          onClick={() => onStartStudy({ title: deck.name, deckIds: [deck.id], filterMode: 'all' })}
+                          className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs shadow-sm transition active:scale-95 flex items-center gap-1"
                         >
-                          Chưa thuộc ({st.red + st.yellow})
+                          <Play className="w-3 h-3 fill-current" />
+                          <span>Học ngay</span>
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => onStartStudy({ title: deck.name, deckIds: [deck.id], filterMode: 'all' })}
-                        className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs shadow-sm transition active:scale-95 flex items-center gap-1"
-                      >
-                        <Play className="w-3 h-3 fill-current" />
-                        <span>Học ngay</span>
-                      </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* In-App Liquid Glass Confirmation Modal (Safe for iOS PWA) */}
+      <ConfirmModal
+        isOpen={!!confirmDelete}
+        title={confirmDelete?.type === 'folder' ? 'Xác nhận xóa thư mục' : 'Xác nhận xóa bộ thẻ bài học'}
+        message={
+          confirmDelete?.type === 'folder'
+            ? `Bạn có chắc chắn muốn xóa thư mục "${confirmDelete?.name}" cùng toàn bộ bài học và thư mục con bên trong không?\n\nHệ thống sẽ dọn sạch toàn bộ thẻ và tiến độ học liên quan.`
+            : `Bạn có chắc chắn muốn xóa bộ thẻ bài học "${confirmDelete?.name}" không?\n\nThao tác này sẽ xóa toàn bộ thẻ trong bài và không thể hoàn tác.`
+        }
+        confirmText="Xóa vĩnh viễn"
+        cancelText="Hủy"
+        variant="danger"
+        onConfirm={() => {
+          if (confirmDelete?.type === 'folder') {
+            onDeleteFolder(confirmDelete.id);
+          } else if (confirmDelete?.type === 'deck') {
+            onDeleteDeck(confirmDelete.id);
+          }
+          setConfirmDelete(null);
+        }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </section>
   );
 }

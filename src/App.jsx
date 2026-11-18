@@ -1,8 +1,34 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Search, Plus, Settings, Sparkles, FolderPlus, BookPlus, Play, X, TrendingUp, Brain } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  Settings,
+  Sparkles,
+  FolderPlus,
+  BookPlus,
+  Play,
+  X,
+  TrendingUp,
+  Brain,
+  User,
+  RotateCw,
+  RefreshCw,
+} from 'lucide-react';
 import { DEFAULT_DECKS, DEFAULT_FOLDERS } from './data/seedData';
 import { calculateNextProgress, getCardProgress, isCardDue } from './lib/spacedRepetition';
-import { DEFAULT_SUPABASE_KEY, DEFAULT_SUPABASE_URL, normalizeCurriculumData, pullCloudData, pushCloudData } from './lib/supabase';
+import {
+  DEFAULT_SUPABASE_KEY,
+  DEFAULT_SUPABASE_URL,
+  normalizeCurriculumData,
+  pullCloudData,
+  pushCloudData,
+  atomicUpsertFolder,
+  atomicDeleteFolder,
+  atomicUpsertDeckWithCards,
+  atomicUpdateDeckMeta,
+  atomicDeleteDeck,
+  atomicUpdateCard,
+} from './lib/supabase';
 import DriveExplorer from './components/DriveExplorer';
 import StudyView from './components/StudyView';
 import ImportModal from './components/ImportModal';
@@ -68,9 +94,7 @@ export default function App() {
   const [settings, setSettings] = useState(() => {
     const saved = safeGet(STORAGE_KEY_SETTINGS, {});
     return {
-      isAdmin: false, // Default to Guest/Student mode for safety on public & shared devices
-      pin: '2309',
-      studentName: 'Học viên',
+      studentName: saved?.studentName || 'Học viên',
       ...saved,
       supabaseUrl: saved?.supabaseUrl || DEFAULT_SUPABASE_URL,
       supabaseKey: saved?.supabaseKey || DEFAULT_SUPABASE_KEY,
@@ -88,13 +112,21 @@ export default function App() {
   });
   const [undoStack, setUndoStack] = useState([]);
 
+  // Modals
   const [importOpen, setImportOpen] = useState(false);
   const [promptOpen, setPromptOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [thesisDocsOpen, setThesisDocsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Dynamic Action Modals
   const [editorMode, setEditorMode] = useState(null);
   const [editingCard, setEditingCard] = useState(null);
+  const [selectedFolderForAction, setSelectedFolderForAction] = useState(null);
+  const [selectedDeckForAction, setSelectedDeckForAction] = useState(null);
+
+  // Cloud Sync state
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
 
   const showToast = useCallback((msg) => {
@@ -103,19 +135,60 @@ export default function App() {
     window.__minminToast = setTimeout(() => setToastMsg(''), 2800);
   }, []);
 
-  const persistAndSyncContent = useCallback(
-    (nextData) => {
-      setAppData(nextData);
-      safeSet(STORAGE_KEY_CONTENT, nextData);
-      if (settings.isAdmin && settings.supabaseUrl && settings.supabaseKey) {
-        pushCloudData(settings.supabaseUrl, settings.supabaseKey, nextData);
-      }
-    },
-    [settings]
-  );
-
   const appDataRef = useRef(appData);
   appDataRef.current = appData;
+
+  const activeSessionRef = useRef(activeSession);
+  activeSessionRef.current = activeSession;
+
+  // Background Cloud Sync (Silent and non-destructive)
+  const syncFromCloud = useCallback(
+    async (isSilent = true) => {
+      if (!settings.supabaseUrl || !settings.supabaseKey) return;
+      if (isCloudSyncing) return;
+      setIsCloudSyncing(true);
+      try {
+        const rawCloud = await pullCloudData(settings.supabaseUrl, settings.supabaseKey);
+        if (rawCloud) {
+          const cloud = normalizeCurriculumData(rawCloud);
+          // Do not replace queue while user is actively learning
+          setAppData(cloud);
+          safeSet(STORAGE_KEY_CONTENT, cloud);
+          if (!isSilent) showToast('⬇ Đã đồng bộ kho bài học mới nhất từ Cloud!');
+        }
+      } catch {
+        // Ignore background network issues
+      } finally {
+        setIsCloudSyncing(false);
+      }
+    },
+    [settings.supabaseUrl, settings.supabaseKey, isCloudSyncing, showToast]
+  );
+
+  // Auto-sync: on startup, when returning to tab, and periodic background poll
+  useEffect(() => {
+    syncFromCloud(true);
+
+    const handleFocus = () => syncFromCloud(true);
+    const handleVisibility = () => {
+      if (!document.hidden) syncFromCloud(true);
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    const interval = setInterval(() => {
+      if (!activeSessionRef.current) {
+        syncFromCloud(true);
+      }
+    }, 25000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(interval);
+    };
+  }, [syncFromCloud]);
 
   const openDeckDirectly = useCallback(
     (deck) => {
@@ -133,6 +206,7 @@ export default function App() {
       const nextSession = {
         title: deck.name,
         deckIds: [deck.id],
+        deckNote: deck.note || '',
         filterMode: 'all',
         direction: 'front_to_back',
         queue: cards,
@@ -175,33 +249,10 @@ export default function App() {
     [openDeckDirectly]
   );
 
-  // Auto-sync on mount & handle deep-link hash
   useEffect(() => {
-    // 1. Resolve deep-link immediately with local cached data
     resolveHash(appData);
+  }, [resolveHash, appData]);
 
-    // 2. Fetch latest data from Cloud and re-check deep link
-    (async () => {
-      if (!settings.supabaseUrl || !settings.supabaseKey) return;
-      const rawCloud = await pullCloudData(settings.supabaseUrl, settings.supabaseKey);
-      if (rawCloud) {
-        const cloud = normalizeCurriculumData(rawCloud);
-        setAppData(cloud);
-        safeSet(STORAGE_KEY_CONTENT, cloud);
-        // If not already in a session, resolve deep-link from fresh cloud data
-        resolveHash(cloud);
-        // If Cloud still had the old hierarchy, auto-push the normalized version to Cloud immediately
-        if (settings.isAdmin && rawCloud.folders?.some((f) => f.id === 'fld_ykhoa')) {
-          pushCloudData(settings.supabaseUrl, settings.supabaseKey, cloud);
-        }
-      } else if (settings.isAdmin) {
-        await pushCloudData(settings.supabaseUrl, settings.supabaseKey, appData);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Listen to hash changes while running
   useEffect(() => {
     const handleHashChange = () => {
       resolveHash(appDataRef.current);
@@ -278,9 +329,11 @@ export default function App() {
       showToast('Tất cả thẻ đều đã thuộc! Chuyển sang ôn toàn bộ thẻ.');
     }
 
+    const firstDeck = appData.decks.find((d) => deckIds.includes(d.id));
     const nextSession = {
       title,
       deckIds,
+      deckNote: firstDeck?.note || '',
       filterMode,
       direction,
       queue: filtered,
@@ -366,7 +419,7 @@ export default function App() {
       safeSet(STORAGE_KEY_ACTIVITY, nextActivity);
     }
 
-    // 3. Restore exact queue snapshot before rating (removes any spliced clones of Red/Yellow cards)
+    // 3. Restore exact queue snapshot before rating
     const nextSession = {
       ...activeSession,
       queue: last.prevQueue || activeSession.queue.slice(0, last.queueLengthBefore),
@@ -381,32 +434,117 @@ export default function App() {
     showToast('Đã hoàn tác thẻ vừa chấm.');
   };
 
-  const handleConfirmImport = ({ parsed, selectedFolderId, deckNameInput }) => {
-    if (parsed.cards.length === 0) return showToast('Chưa có thẻ hợp lệ để nạp!');
+  // ============================================================================
+  // ATOMIC CRUD HANDLERS (Shared Mini Drive for 10 users)
+  // ============================================================================
 
-    let nextFolders = appData.folders.slice();
-    let targetFolderId = selectedFolderId;
+  const handleCreateFolder = ({ name, icon }) => {
+    if (!name) return showToast('Vui lòng nhập tên thư mục!');
+    const newFolder = {
+      id: `fld_${Date.now()}`,
+      name,
+      icon: icon || '📁',
+      author: settings.studentName || 'Thành viên',
+      parentId: currentFolderId,
+    };
+    const nextFolders = [...appData.folders, newFolder];
+    const nextData = { ...appData, folders: nextFolders };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+    atomicUpsertFolder(settings.supabaseUrl, settings.supabaseKey, newFolder);
+    setEditorMode(null);
+    showToast(`Đã tạo thư mục "${name}"`);
+  };
 
-    // Only auto-resolve folderPath from JSON if user hasn't explicitly selected a specific folder
-    if (!selectedFolderId && parsed.folderPath?.length > 0) {
-      let parentId = null;
-      for (const rawName of parsed.folderPath) {
-        const name = String(rawName || '').trim();
-        if (!name) continue;
-        let found = nextFolders.find((f) => (f.parentId || null) === parentId && f.name.toLowerCase() === name.toLowerCase());
-        if (!found) {
-          found = { id: `fld_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, name, icon: '📁', parentId };
-          nextFolders.push(found);
-        }
-        parentId = found.id;
+  const handleEditFolder = (folderId, { name, icon }) => {
+    if (!name) return showToast('Vui lòng nhập tên thư mục!');
+    const folder = appData.folders.find((f) => f.id === folderId);
+    if (!folder) return;
+    const updated = { ...folder, name, icon: icon || '📁' };
+    const nextFolders = appData.folders.map((f) => (f.id === folderId ? updated : f));
+    const nextData = { ...appData, folders: nextFolders };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+    atomicUpsertFolder(settings.supabaseUrl, settings.supabaseKey, updated);
+    setEditorMode(null);
+    setSelectedFolderForAction(null);
+    showToast(`Đã cập nhật thư mục "${name}"`);
+  };
+
+  const handleMoveFolder = (folderId, targetParentId) => {
+    const folder = appData.folders.find((f) => f.id === folderId);
+    if (!folder) return;
+    const updated = { ...folder, parentId: targetParentId || null };
+    const nextFolders = appData.folders.map((f) => (f.id === folderId ? updated : f));
+    const nextData = { ...appData, folders: nextFolders };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+    atomicUpsertFolder(settings.supabaseUrl, settings.supabaseKey, updated);
+    setEditorMode(null);
+    setSelectedFolderForAction(null);
+    showToast(`Đã chuyển thư mục "${folder.name}"`);
+  };
+
+  const handleDeleteFolder = (folderId) => {
+    const descendantFolderIds = getAllDescendantFolderIds(folderId, appData.folders);
+    const affectedDeckIds = appData.decks.filter((d) => descendantFolderIds.has(d.folderId)).map((d) => d.id);
+    const affectedCardIds = new Set();
+    for (const d of appData.decks) {
+      if (descendantFolderIds.has(d.folderId)) {
+        for (const c of d.cards) affectedCardIds.add(c.id);
       }
-      targetFolderId = parentId;
     }
 
-    const deckName = deckNameInput || `Bài học mới ${new Date().toLocaleDateString('vi-VN')}`;
-    const nextDecks = appData.decks.map((d) => ({ ...d, cards: d.cards.slice() }));
-    const existing = nextDecks.find((d) => (d.folderId || null) === targetFolderId && d.name.toLowerCase() === deckName.toLowerCase());
+    // Atomic DELETE from Cloud
+    for (const fid of descendantFolderIds) {
+      atomicDeleteFolder(settings.supabaseUrl, settings.supabaseKey, fid);
+    }
+    for (const did of affectedDeckIds) {
+      atomicDeleteDeck(settings.supabaseUrl, settings.supabaseKey, did);
+    }
 
+    const nextFolders = appData.folders.filter((f) => !descendantFolderIds.has(f.id));
+    const nextDecks = appData.decks.filter((d) => !descendantFolderIds.has(d.folderId));
+    const nextData = { folders: nextFolders, decks: nextDecks };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+
+    if (affectedCardIds.size > 0) {
+      const nextProgressMap = { ...progressMap };
+      let changed = false;
+      for (const cid of affectedCardIds) {
+        if (nextProgressMap[cid]) {
+          delete nextProgressMap[cid];
+          changed = true;
+        }
+      }
+      if (changed) {
+        setProgressMap(nextProgressMap);
+        safeSet(STORAGE_KEY_PROGRESS, nextProgressMap);
+      }
+    }
+
+    if (currentFolderId && descendantFolderIds.has(currentFolderId)) {
+      const parent = appData.folders.find((f) => f.id === folderId)?.parentId || null;
+      setCurrentFolderId(parent);
+    }
+    showToast('Đã xóa thư mục và dữ liệu liên quan.');
+  };
+
+  const handleConfirmImport = ({ parsed, selectedFolderId, deckNameInput, deckNoteInput }) => {
+    if (parsed.cards.length === 0) return showToast('Chưa có thẻ hợp lệ để nạp!');
+
+    const targetFolderId = selectedFolderId !== undefined ? selectedFolderId : currentFolderId;
+    const deckName = deckNameInput || `Bài học mới ${new Date().toLocaleDateString('vi-VN')}`;
+    const author = settings.studentName || 'Thành viên';
+    const note = deckNoteInput !== undefined ? deckNoteInput : (parsed.note || '');
+
+    const nextDecks = appData.decks.map((d) => ({ ...d, cards: d.cards.slice() }));
+    const existing = nextDecks.find(
+      (d) => (d.folderId || null) === targetFolderId && d.name.toLowerCase() === deckName.toLowerCase()
+    );
+
+    let targetDeck;
     if (existing) {
       let added = 0;
       let updated = 0;
@@ -420,21 +558,145 @@ export default function App() {
           added++;
         }
       }
-      showToast(`Đã gộp vào "${existing.name}": thêm ${added} thẻ mới, cập nhật ${updated} thẻ!`);
+      if (note) existing.note = note;
+      existing.author = author;
+      existing.updatedAt = new Date().toLocaleDateString('sv-SE');
+      targetDeck = existing;
+      showToast(`Đã gộp vào "${existing.name}": thêm ${added} thẻ, cập nhật ${updated} thẻ!`);
     } else {
-      nextDecks.push({
+      targetDeck = {
         id: `deck_${Date.now()}`,
         folderId: targetFolderId,
         name: deckName,
+        note,
+        author,
         updatedAt: new Date().toLocaleDateString('sv-SE'),
         cards: parsed.cards,
-      });
+      };
+      nextDecks.push(targetDeck);
       showToast(`Đã tạo bộ thẻ "${deckName}" (${parsed.cards.length} thẻ)!`);
     }
 
+    const nextData = { folders: appData.folders, decks: nextDecks };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+
+    // Atomic Cloud Sync
+    atomicUpsertDeckWithCards(settings.supabaseUrl, settings.supabaseKey, targetDeck, targetDeck.cards);
+
     setCurrentFolderId(targetFolderId);
-    persistAndSyncContent({ folders: nextFolders, decks: nextDecks });
     setImportOpen(false);
+  };
+
+  const handleEditDeck = ({ id, name, note }, openEditMode = false) => {
+    if (openEditMode) {
+      const deck = appData.decks.find((d) => d.id === id);
+      if (deck) {
+        setSelectedDeckForAction(deck);
+        setEditorMode('edit_deck');
+      }
+      return;
+    }
+    const deck = appData.decks.find((d) => d.id === id);
+    if (!deck) return;
+    const updated = {
+      ...deck,
+      name: name || deck.name,
+      note: note !== undefined ? note : deck.note,
+      updatedAt: new Date().toLocaleDateString('sv-SE'),
+    };
+    const nextDecks = appData.decks.map((d) => (d.id === id ? updated : d));
+    const nextData = { ...appData, decks: nextDecks };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+    atomicUpdateDeckMeta(settings.supabaseUrl, settings.supabaseKey, id, { name: updated.name, note: updated.note });
+    setEditorMode(null);
+    setSelectedDeckForAction(null);
+    showToast(`Đã cập nhật bài học "${updated.name}"`);
+  };
+
+  const handleMoveDeck = (deckId, newFolderId) => {
+    const deck = appData.decks.find((d) => d.id === deckId);
+    if (!deck) return;
+    const updated = { ...deck, folderId: newFolderId || null, updatedAt: new Date().toLocaleDateString('sv-SE') };
+    const nextDecks = appData.decks.map((d) => (d.id === deckId ? updated : d));
+    const nextData = { ...appData, decks: nextDecks };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+    atomicUpdateDeckMeta(settings.supabaseUrl, settings.supabaseKey, deckId, { folderId: updated.folderId });
+    setEditorMode(null);
+    setSelectedDeckForAction(null);
+    showToast(`Đã chuyển bài "${deck.name}" sang thư mục mới`);
+  };
+
+  const handleDeleteDeck = (deckId) => {
+    const deck = appData.decks.find((d) => d.id === deckId);
+    const cardIds = (deck?.cards || []).map((c) => c.id);
+
+    // Atomic Cloud Delete
+    atomicDeleteDeck(settings.supabaseUrl, settings.supabaseKey, deckId);
+
+    const nextDecks = appData.decks.filter((d) => d.id !== deckId);
+    const nextData = { ...appData, decks: nextDecks };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+
+    if (cardIds.length > 0) {
+      const nextProgressMap = { ...progressMap };
+      let changed = false;
+      for (const cid of cardIds) {
+        if (nextProgressMap[cid]) {
+          delete nextProgressMap[cid];
+          changed = true;
+        }
+      }
+      if (changed) {
+        setProgressMap(nextProgressMap);
+        safeSet(STORAGE_KEY_PROGRESS, nextProgressMap);
+      }
+    }
+    showToast('Đã xóa bộ bài học.');
+  };
+
+  const handleSaveCard = (updated) => {
+    const target = editingCard || activeSession?.queue[activeSession.currentIndex];
+    if (!target) return;
+    const updatedCard = { ...target, ...updated };
+
+    const nextDecks = appData.decks.map((d) => ({
+      ...d,
+      cards: d.cards.map((c) => (c.id === target.id ? updatedCard : c)),
+    }));
+    const nextData = { ...appData, decks: nextDecks };
+    setAppData(nextData);
+    safeSet(STORAGE_KEY_CONTENT, nextData);
+
+    // Atomic Card Update
+    atomicUpdateCard(settings.supabaseUrl, settings.supabaseKey, updatedCard);
+
+    if (activeSession) {
+      const nextQueue = activeSession.queue.map((c) => (c.id === target.id ? updatedCard : c));
+      const nextSession = { ...activeSession, queue: nextQueue };
+      setActiveSession(nextSession);
+      safeSet(STORAGE_KEY_SESSION, nextSession);
+    }
+
+    setEditorMode(null);
+    setEditingCard(null);
+    showToast('Đã cập nhật nội dung thẻ!');
+  };
+
+  const handleShareLink = (hashFragment, successMessage) => {
+    const url = `${window.location.origin}${window.location.pathname}${hashFragment}`;
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        showToast(successMessage || 'Đã sao chép liên kết chia sẻ!');
+      }).catch(() => {
+        showToast(`Link chia sẻ: ${url}`);
+      });
+    } else {
+      showToast(`Link chia sẻ: ${url}`);
+    }
   };
 
   return (
@@ -446,7 +708,7 @@ export default function App() {
         <div className="absolute -bottom-20 left-1/4 w-96 h-96 rounded-full bg-teal-200/30 blur-3xl" />
       </div>
 
-      {/* Top Navigation - Streamlined 1-row header, hidden during Study Session */}
+      {/* Top Navigation - Single Row Mini Drive Header (Hidden during active Study session) */}
       {!activeSession && (
         <header className={`sticky top-0 px-3 sm:px-4 pt-2.5 pb-2 transition-all ${plusMenuOpen ? 'z-50' : 'z-30'}`}>
           <div className="max-w-5xl mx-auto glass-panel rounded-2xl px-3 sm:px-4 py-2 flex items-center justify-between gap-2 shadow-sm">
@@ -466,23 +728,30 @@ export default function App() {
                 <span className="font-bold tracking-tight text-slate-800 text-sm sm:text-base">FlashCard MinMin</span>
                 <span
                   className={`w-2 h-2 rounded-full inline-block ${
-                    settings.supabaseUrl ? 'bg-emerald-500 ring-2 ring-emerald-200' : 'bg-slate-300'
+                    isCloudSyncing
+                      ? 'bg-amber-400 animate-pulse'
+                      : settings.supabaseUrl
+                        ? 'bg-emerald-500 ring-2 ring-emerald-200'
+                        : 'bg-slate-300'
                   }`}
-                  title={settings.supabaseUrl ? 'Cloud Supabase đã kết nối' : 'Kho dữ liệu Local'}
+                  title={isCloudSyncing ? 'Đang đồng bộ Cloud...' : 'Đám mây Mini Drive kết nối'}
                 />
-                {settings.isAdmin ? (
-                  <span className="hidden sm:inline px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                    Admin
-                  </span>
-                ) : (
-                  <span className="hidden sm:inline px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium truncate max-w-[80px]">
-                    {settings.studentName || 'Học viên'}
-                  </span>
-                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSettingsOpen(true);
+                  }}
+                  className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 text-[11px] font-semibold border border-sky-200/80 transition"
+                  title="Bấm để đổi tên thành viên"
+                >
+                  <User className="w-3 h-3 text-sky-600" />
+                  <span className="truncate max-w-[85px]">{settings.studentName || 'Học viên'}</span>
+                </button>
               </div>
             </button>
 
-            {/* Right Actions: Analytics + Thesis Docs + Search + Plus/Prompt AI + Settings */}
+            {/* Right Actions: Analytics + Docs + Search + Plus/Prompt AI + Settings */}
             <div className="flex items-center gap-1 sm:gap-1.5">
               <button
                 type="button"
@@ -497,7 +766,7 @@ export default function App() {
                 type="button"
                 onClick={() => setThesisDocsOpen(true)}
                 className="glass-pill w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-slate-600 hover:text-slate-900 flex items-center justify-center transition"
-                title="Kiến trúc Đồ án & Thuật toán Spaced Repetition"
+                title="Hướng dẫn sử dụng & Cơ chế Spaced Repetition"
               >
                 <Brain className="w-4 h-4 text-indigo-600" />
               </button>
@@ -513,226 +782,169 @@ export default function App() {
                 <Search className="w-4 h-4" />
               </button>
 
-              {/* If Admin: show full "+ Thêm" menu. If Student: hide + Thêm, show direct Prompt AI */}
-              {settings.isAdmin ? (
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setPlusMenuOpen((v) => !v)}
-                    className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-medium text-xs sm:text-sm flex items-center gap-1 shadow-sm transition active:scale-95"
-                    title="Thêm mới"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span className="hidden sm:inline">Thêm</span>
-                  </button>
-
-                  {plusMenuOpen && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setPlusMenuOpen(false)} />
-                      <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl p-1.5 z-50 shadow-2xl space-y-0.5 border border-slate-200">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPlusMenuOpen(false);
-                            setImportOpen(true);
-                          }}
-                          className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
-                        >
-                          <BookPlus className="w-4 h-4 text-sky-600" />
-                          <span>Nạp bộ bài học mới</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPlusMenuOpen(false);
-                            setEditorMode('new_folder');
-                          }}
-                          className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
-                        >
-                          <FolderPlus className="w-4 h-4 text-emerald-600" />
-                          <span>Tạo thư mục mới</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPlusMenuOpen(false);
-                            setPromptOpen(true);
-                          }}
-                          className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
-                        >
-                          <Sparkles className="w-4 h-4 text-amber-500" />
-                          <span>Prompt tạo thẻ AI</span>
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ) : (
+              {/* Full "+ Thêm" menu available to ALL 10 members */}
+              <div className="relative">
                 <button
                   type="button"
-                  onClick={() => setPromptOpen(true)}
-                  className="glass-pill px-2.5 py-1.5 rounded-xl text-xs font-medium text-amber-700 hover:text-amber-800 hover:bg-amber-50 flex items-center gap-1 transition"
-                  title="Prompt tạo thẻ AI chuẩn"
+                  onClick={() => setPlusMenuOpen((v) => !v)}
+                  className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-medium text-xs sm:text-sm flex items-center gap-1 shadow-sm transition active:scale-95"
+                  title="Thêm mới bài học / thư mục"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span className="hidden sm:inline">Prompt AI</span>
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">Thêm</span>
                 </button>
-              )}
+
+                {plusMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setPlusMenuOpen(false)} />
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl p-1.5 z-50 shadow-2xl space-y-0.5 border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPlusMenuOpen(false);
+                          setImportOpen(true);
+                        }}
+                        className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
+                      >
+                        <BookPlus className="w-4 h-4 text-sky-600" />
+                        <span>Nạp bộ bài học mới</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPlusMenuOpen(false);
+                          setEditorMode('new_folder');
+                        }}
+                        className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
+                      >
+                        <FolderPlus className="w-4 h-4 text-emerald-600" />
+                        <span>Tạo thư mục mới</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPlusMenuOpen(false);
+                          setPromptOpen(true);
+                        }}
+                        className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
+                      >
+                        <Sparkles className="w-4 h-4 text-amber-500" />
+                        <span>Prompt tạo thẻ AI</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
 
               <button
                 type="button"
                 onClick={() => setSettingsOpen(true)}
                 className="glass-pill w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-slate-600 hover:text-slate-900 flex items-center justify-center transition"
-                title="Cài đặt"
+                title="Cài đặt & Đồng bộ Cloud"
               >
                 <Settings className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* Expandable Search Input */}
-          {(showSearch || searchQuery) && (
-            <div className="max-w-5xl mx-auto mt-2">
+          {/* Quick Search Input */}
+          {showSearch && (
+            <div className="max-w-5xl mx-auto mt-2 animate-fadeIn">
               <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   autoFocus
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Tìm môn, bài học hoặc nội dung thẻ..."
-                  className="w-full glass-input rounded-xl pl-9 pr-8 py-2 text-sm placeholder:text-slate-400 shadow-sm"
+                  placeholder="Tìm kiếm theo câu hỏi, đáp án, hoặc tên bài học..."
+                  className="w-full glass-input rounded-2xl pl-9 pr-9 py-2 text-xs sm:text-sm text-slate-800 shadow-sm"
                 />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setShowSearch(false);
-                  }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           )}
         </header>
       )}
 
-      <main className="max-w-5xl mx-auto px-3 sm:px-4 pt-2 pb-6 space-y-4">
+      {/* Main Container */}
+      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-4">
+        {/* Resume Banner */}
         {!activeSession && resumeCandidate && (
-          <div className="glass-panel rounded-2xl p-3 border-l-4 border-l-sky-500 flex flex-wrap items-center justify-between gap-3 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-sky-100 border border-sky-200 flex items-center justify-center text-sky-600">
-                <Play className="w-4 h-4 fill-current" />
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-wider text-sky-600 font-semibold">Phiên học đang dở</p>
-                <p className="text-sm text-slate-800 font-medium">
-                  {resumeCandidate.title} — Còn {Math.max(1, resumeCandidate.queue.length - resumeCandidate.currentIndex)} lượt thẻ trong phiên (Đã học {resumeCandidate.reviewedCount || resumeCandidate.currentIndex} lượt)
-                </p>
-              </div>
+          <div className="glass-panel rounded-2xl p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-2.5 shadow-sm border-l-4 border-l-sky-500">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">
+                Đang học dở: {resumeCandidate.title}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Đã học {resumeCandidate.currentIndex} / {resumeCandidate.queue.length} thẻ
+              </p>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => startStudySession({ resumeState: resumeCandidate })}
-                className="px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs transition shadow-sm"
-              >
-                Học tiếp ngay
-              </button>
               <button
                 type="button"
                 onClick={() => {
                   localStorage.removeItem(STORAGE_KEY_SESSION);
                   setResumeCandidate(null);
                 }}
-                className="glass-pill px-2.5 py-1.5 rounded-xl text-xs text-slate-600 hover:text-slate-900"
+                className="glass-pill px-2.5 py-1.5 rounded-xl text-xs text-slate-500 hover:text-slate-800"
               >
                 Bỏ qua
+              </button>
+              <button
+                type="button"
+                onClick={() => startStudySession({ resumeState: resumeCandidate })}
+                className="px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-semibold text-xs shadow-sm transition active:scale-95 flex items-center gap-1.5"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>Tiếp tục học</span>
               </button>
             </div>
           </div>
         )}
 
+        {/* View Mode: DriveExplorer vs StudyView */}
         {!activeSession ? (
           <DriveExplorer
             appData={appData}
             progressMap={progressMap}
             currentFolderId={currentFolderId}
             setCurrentFolderId={setCurrentFolderId}
-            isAdmin={settings.isAdmin}
             searchQuery={searchQuery}
             onStartStudy={startStudySession}
-            onNewFolder={() => (settings.isAdmin ? setEditorMode('new_folder') : showToast('Cần mở khóa PIN Chủ sở hữu.'))}
-            onNewDeck={() => (settings.isAdmin ? setImportOpen(true) : showToast('Cần mở khóa PIN Chủ sở hữu.'))}
-            onDeleteFolder={(fid) => {
-              const descendantIds = getAllDescendantFolderIds(fid, appData.folders);
-              const decksToDelete = appData.decks.filter((d) => descendantIds.has(d.folderId));
-              const cardIdsToDelete = new Set(decksToDelete.flatMap((d) => (d.cards || []).map((c) => c.id)));
-
-              // Clean orphaned progress in progressMap
-              let nextProgressMap = { ...progressMap };
-              let cleanedAny = false;
-              for (const cid of cardIdsToDelete) {
-                if (nextProgressMap[cid]) {
-                  delete nextProgressMap[cid];
-                  cleanedAny = true;
-                }
-              }
-              if (cleanedAny) {
-                setProgressMap(nextProgressMap);
-                safeSet(STORAGE_KEY_PROGRESS, nextProgressMap);
-              }
-
-              // Reset current folder if inside deleted tree
-              if (descendantIds.has(currentFolderId)) {
-                setCurrentFolderId(null);
-              }
-
-              // Clear active session / resume candidate if affected
-              const deletedDeckIds = new Set(decksToDelete.map((d) => d.id));
-              if (resumeCandidate?.deckIds?.some((id) => deletedDeckIds.has(id))) {
-                localStorage.removeItem(STORAGE_KEY_SESSION);
-                setResumeCandidate(null);
-              }
-
-              const nextFolders = appData.folders.filter((f) => !descendantIds.has(f.id));
-              const nextDecks = appData.decks.filter((d) => !descendantIds.has(d.folderId));
-              persistAndSyncContent({ folders: nextFolders, decks: nextDecks });
-              showToast(`Đã xóa thư mục cùng ${decksToDelete.length} bài học liên quan.`);
+            onNewFolder={() => setEditorMode('new_folder')}
+            onNewDeck={() => setImportOpen(true)}
+            onEditFolder={(f) => {
+              setSelectedFolderForAction(f);
+              setEditorMode('edit_folder');
             }}
-            onDeleteDeck={(did) => {
-              const targetDeck = appData.decks.find((d) => d.id === did);
-              const cardIdsToDelete = new Set((targetDeck?.cards || []).map((c) => c.id));
-
-              // Clean orphaned progress in progressMap
-              let nextProgressMap = { ...progressMap };
-              let cleanedAny = false;
-              for (const cid of cardIdsToDelete) {
-                if (nextProgressMap[cid]) {
-                  delete nextProgressMap[cid];
-                  cleanedAny = true;
-                }
-              }
-              if (cleanedAny) {
-                setProgressMap(nextProgressMap);
-                safeSet(STORAGE_KEY_PROGRESS, nextProgressMap);
-              }
-
-              if (resumeCandidate?.deckIds?.includes(did)) {
-                localStorage.removeItem(STORAGE_KEY_SESSION);
-                setResumeCandidate(null);
-              }
-
-              const nextDecks = appData.decks.filter((d) => d.id !== did);
-              persistAndSyncContent({ ...appData, decks: nextDecks });
-              showToast(`Đã xóa bộ thẻ "${targetDeck?.name || ''}".`);
+            onMoveFolder={(f) => {
+              setSelectedFolderForAction(f);
+              setEditorMode('move_folder');
             }}
-            onShareLink={(hash, msg) => {
-              navigator.clipboard?.writeText(window.location.origin + window.location.pathname + hash).catch(() => {});
-              showToast(msg);
+            onEditDeck={(d) => {
+              setSelectedDeckForAction(d);
+              setEditorMode('edit_deck');
             }}
+            onMoveDeck={(d) => {
+              setSelectedDeckForAction(d);
+              setEditorMode('move_deck');
+            }}
+            onViewNote={(d) => {
+              setSelectedDeckForAction(d);
+              setEditorMode('view_note');
+            }}
+            onDeleteFolder={handleDeleteFolder}
+            onDeleteDeck={handleDeleteDeck}
+            onShareLink={handleShareLink}
             getFolderPath={getFolderPath}
             getFolderRecursiveDeckIds={getFolderRecursiveDeckIds}
             getCardsByDeckIds={getCardsByDeckIds}
@@ -746,7 +958,7 @@ export default function App() {
             onExit={() => {
               setActiveSession(null);
               if (window.location.hash.startsWith('#deck=')) {
-                const nextHash = currentFolderId ? `#folder=${encodeURIComponent(currentFolderId)}` : '';
+                const nextHash = currentFolderId ? `#folder=${currentFolderId}` : '';
                 window.history.replaceState(null, '', window.location.pathname + nextHash);
               }
             }}
@@ -765,25 +977,39 @@ export default function App() {
               showToast('Đã trộn ngẫu nhiên các thẻ còn lại!');
             }}
             onChangeFilter={(filterMode) =>
-              startStudySession({ title: activeSession.title, deckIds: activeSession.deckIds, filterMode, direction: activeSession.direction })
+              startStudySession({
+                title: activeSession.title,
+                deckIds: activeSession.deckIds,
+                filterMode,
+                direction: activeSession.direction,
+              })
             }
             onChangeDirection={(direction) => setActiveSession({ ...activeSession, direction, isFlipped: false })}
             onEditCard={(targetCard) => {
-              if (settings.isAdmin) {
-                const cardToEdit = targetCard || (activeSession ? activeSession.queue[activeSession.currentIndex] : null);
-                setEditingCard(cardToEdit);
-                setEditorMode('edit_card');
-              } else {
-                showToast('Cần mở khóa PIN để sửa thẻ.');
-              }
+              const cardToEdit = targetCard || (activeSession ? activeSession.queue[activeSession.currentIndex] : null);
+              setEditingCard(cardToEdit);
+              setEditorMode('edit_card');
             }}
             onRestartSession={(filterMode) =>
-              startStudySession({ title: activeSession.title, deckIds: activeSession.deckIds, filterMode, direction: activeSession.direction })
+              startStudySession({
+                title: activeSession.title,
+                deckIds: activeSession.deckIds,
+                filterMode,
+                direction: activeSession.direction,
+              })
             }
+            onViewDeckNote={() => {
+              const deck = appData.decks.find((d) => activeSession.deckIds.includes(d.id));
+              if (deck) {
+                setSelectedDeckForAction(deck);
+                setEditorMode('view_note');
+              }
+            }}
           />
         )}
       </main>
 
+      {/* Modals */}
       <ImportModal
         isOpen={importOpen}
         onClose={() => setImportOpen(false)}
@@ -793,43 +1019,31 @@ export default function App() {
         onConfirmImport={handleConfirmImport}
       />
 
-      <PromptModal isOpen={promptOpen} onClose={() => setPromptOpen(false)} onCopySuccess={() => showToast('Đã sao chép Prompt chuẩn!')} />
+      <PromptModal
+        isOpen={promptOpen}
+        onClose={() => setPromptOpen(false)}
+        onCopySuccess={() => showToast('Đã sao chép Prompt chuẩn!')}
+      />
 
       <EditorModal
-        key={editorMode ? `${editorMode}_${editingCard?.id || (activeSession ? activeSession.queue[activeSession.currentIndex]?.id : 'none')}` : 'closed'}
+        key={editorMode || 'closed'}
         mode={editorMode}
         card={editingCard || (activeSession ? activeSession.queue[activeSession.currentIndex] : null)}
+        folder={selectedFolderForAction}
+        deck={selectedDeckForAction}
+        folders={appData.folders}
         onClose={() => {
           setEditorMode(null);
           setEditingCard(null);
+          setSelectedFolderForAction(null);
+          setSelectedDeckForAction(null);
         }}
-        onSaveFolder={({ name, icon }) => {
-          if (!name) return showToast('Vui lòng nhập tên thư mục!');
-          persistAndSyncContent({
-            ...appData,
-            folders: [...appData.folders, { id: `fld_${Date.now()}`, name, icon, parentId: currentFolderId }],
-          });
-          setEditorMode(null);
-          showToast(`Đã tạo thư mục "${name}"`);
-        }}
-        onSaveCard={(updated) => {
-          const target = editingCard || activeSession.queue[activeSession.currentIndex];
-          const nextDecks = appData.decks.map((d) => ({
-            ...d,
-            cards: d.cards.map((c) => (c.id === target.id ? { ...c, ...updated } : c)),
-          }));
-          persistAndSyncContent({ ...appData, decks: nextDecks });
-          // Update ALL instances of this card in queue (including any repetition clones)
-          const nextQueue = activeSession.queue.map((c) =>
-            c.id === target.id ? { ...c, ...updated } : c
-          );
-          const nextSession = { ...activeSession, queue: nextQueue };
-          setActiveSession(nextSession);
-          safeSet(STORAGE_KEY_SESSION, nextSession);
-          setEditorMode(null);
-          setEditingCard(null);
-          showToast('Đã cập nhật nội dung thẻ!');
-        }}
+        onSaveFolder={handleCreateFolder}
+        onEditFolder={handleEditFolder}
+        onMoveFolder={handleMoveFolder}
+        onEditDeck={handleEditDeck}
+        onMoveDeck={handleMoveDeck}
+        onSaveCard={handleSaveCard}
       />
 
       <SettingsModal
@@ -842,29 +1056,16 @@ export default function App() {
           setSettings(next);
           safeSet(STORAGE_KEY_SETTINGS, next);
         }}
-        onPushCloud={async () => {
-          const res = await pushCloudData(settings.supabaseUrl, settings.supabaseKey, appData);
-          showToast(res.ok ? '☁ Đã đẩy toàn bộ cây thư mục & thẻ lên Cloud!' : 'Lỗi đồng bộ lên Supabase.');
-        }}
-        onPullCloud={async () => {
-          const rawCloud = await pullCloudData(settings.supabaseUrl, settings.supabaseKey);
-          if (rawCloud) {
-            const cloud = normalizeCurriculumData(rawCloud);
-            setAppData(cloud);
-            safeSet(STORAGE_KEY_CONTENT, cloud);
-            showToast('⬇ Đã đồng bộ kho thẻ mới nhất từ Cloud!');
-          } else {
-            showToast('Chưa có dữ liệu trên Cloud.');
-          }
-        }}
+        onPullCloud={() => syncFromCloud(false)}
         onExportBackup={() => {
-          const blob = new Blob([JSON.stringify({ version: 2, exportedAt: new Date().toISOString(), appData, progressMap }, null, 2)], {
-            type: 'application/json',
-          });
+          const blob = new Blob(
+            [JSON.stringify({ version: 2, exportedAt: new Date().toISOString(), appData, progressMap }, null, 2)],
+            { type: 'application/json' }
+          );
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `FlashCard_MinMin_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+          a.download = `FlashCard_MinMin_Backup_${new Date().toLocaleDateString('sv-SE')}.json`;
           a.click();
           URL.revokeObjectURL(url);
           showToast('Đã tải xuống file sao lưu toàn bộ!');
@@ -876,7 +1077,11 @@ export default function App() {
           reader.onload = () => {
             try {
               const parsed = JSON.parse(String(reader.result || '{}'));
-              if (parsed.appData?.folders) persistAndSyncContent(parsed.appData);
+              if (parsed.appData?.folders) {
+                setAppData(parsed.appData);
+                safeSet(STORAGE_KEY_CONTENT, parsed.appData);
+                pushCloudData(settings.supabaseUrl, settings.supabaseKey, parsed.appData);
+              }
               if (parsed.progressMap) {
                 setProgressMap(parsed.progressMap);
                 safeSet(STORAGE_KEY_PROGRESS, parsed.progressMap);
@@ -908,7 +1113,7 @@ export default function App() {
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `MinMin_TienDoHoc_${(settings.studentName || 'HocVien').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`;
+          a.download = `MinMin_TienDoHoc_${(settings.studentName || 'HocVien').replace(/\s+/g, '_')}_${new Date().toLocaleDateString('sv-SE')}.json`;
           a.click();
           URL.revokeObjectURL(url);
           showToast('Đã tải xuống file tiến độ học tập cá nhân!');
@@ -947,7 +1152,7 @@ export default function App() {
           localStorage.removeItem(STORAGE_KEY_PROGRESS);
           localStorage.removeItem(STORAGE_KEY_SESSION);
           setResumeCandidate(null);
-          showToast('Đã đặt lại toàn bộ tiến độ về Chưa nhớ.');
+          showToast('Đã đặt lại toàn bộ tiến độ về Chưa học.');
         }}
       />
 
@@ -962,10 +1167,7 @@ export default function App() {
         onStartStudy={startStudySession}
       />
 
-      <ThesisDocsModal
-        isOpen={thesisDocsOpen}
-        onClose={() => setThesisDocsOpen(false)}
-      />
+      <ThesisDocsModal isOpen={thesisDocsOpen} onClose={() => setThesisDocsOpen(false)} />
 
       {toastMsg && (
         <div className="fixed bottom-5 right-5 z-50 bg-slate-900/90 text-white rounded-2xl px-4 py-2.5 text-xs sm:text-sm font-medium shadow-2xl border border-white/20 backdrop-blur-md max-w-[90vw] sm:max-w-md line-clamp-2 break-words">

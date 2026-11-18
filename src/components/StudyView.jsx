@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   ImageOff,
   ZoomIn,
+  FileText,
 } from 'lucide-react';
 import { computeStatsForCards, getCardProgress } from '../lib/spacedRepetition';
 
@@ -55,6 +56,7 @@ export default function StudyView({
   onChangeDirection,
   onEditCard,
   onRestartSession,
+  onViewDeckNote,
 }) {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -513,33 +515,48 @@ export default function StudyView({
             </div>
 
             {/* Actions: Shuffle & Quick Edit */}
-            <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  onShuffle();
-                  setOptionsOpen(false);
-                }}
-                className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition"
-              >
-                <Shuffle className="w-3.5 h-3.5 text-sky-600" />
-                <span>Trộn ngẫu nhiên</span>
-              </button>
-              {!isComplete && (
+            <div className="pt-2 border-t border-slate-100 space-y-2">
+              {session.deckNote && (
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
+                  onClick={() => {
                     setOptionsOpen(false);
-                    onEditCard(card);
+                    onViewDeckNote?.();
+                  }}
+                  className="w-full py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition border border-amber-200"
+                >
+                  <FileText className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Xem ghi chú bài học (Study Note)</span>
+                </button>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onShuffle();
+                    setOptionsOpen(false);
                   }}
                   className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition"
                 >
-                  <Edit3 className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Sửa thẻ này</span>
+                  <Shuffle className="w-3.5 h-3.5 text-sky-600" />
+                  <span>Trộn ngẫu nhiên</span>
                 </button>
-              )}
+                {!isComplete && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setOptionsOpen(false);
+                      onEditCard(card);
+                    }}
+                    className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Sửa thẻ này</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             <button

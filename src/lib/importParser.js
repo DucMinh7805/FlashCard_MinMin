@@ -39,6 +39,7 @@ export function parseImportInput(rawText) {
         return {
           cards: parsed.cards.map((c, idx) => normalizeCardObject(c, idx)).filter(Boolean),
           deckName: parsed.deck || parsed.title || '',
+          note: String(parsed.note || parsed.summary || '').trim(),
           folderPath: Array.isArray(parsed.folderPath)
             ? parsed.folderPath
             : parsed.subject

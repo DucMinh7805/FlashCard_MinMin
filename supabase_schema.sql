@@ -19,6 +19,7 @@ create table if not exists public.mm_folders (
   id text primary key,
   name text not null,
   icon text default '📁',
+  author text default '',
   parent_id text null,
   created_at timestamptz default now()
 );
@@ -27,9 +28,16 @@ create table if not exists public.mm_decks (
   id text primary key,
   folder_id text null,
   name text not null,
+  note text default '',
+  author text default '',
   updated_at text,
   created_at timestamptz default now()
 );
+
+-- Bổ sung cột cho các database đã tạo trước đó
+alter table public.mm_folders add column if not exists author text default '';
+alter table public.mm_decks add column if not exists note text default '';
+alter table public.mm_decks add column if not exists author text default '';
 
 create table if not exists public.mm_cards (
   id text primary key,

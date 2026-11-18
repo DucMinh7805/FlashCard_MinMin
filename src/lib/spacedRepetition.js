@@ -1,25 +1,33 @@
 export function getCardProgress(progressMap, cardId) {
-  return progressMap[cardId] || { status: 'red', box: 0, dueDate: 0, lastReviewed: 0 };
+  const p = progressMap?.[cardId];
+  if (!p || !p.lastReviewed) {
+    return { status: 'new', box: 0, dueDate: 0, lastReviewed: 0 };
+  }
+  return p;
 }
 
 export function isCardDue(progressMap, cardId) {
   const p = getCardProgress(progressMap, cardId);
+  if (p.status === 'new') return true;
   return Date.now() >= (p.dueDate || 0);
 }
 
 export function computeStatsForCards(cards, progressMap) {
+  let newCount = 0;
   let red = 0;
   let yellow = 0;
   let green = 0;
   let due = 0;
-  for (const c of cards) {
+  for (const c of cards || []) {
     const p = getCardProgress(progressMap, c.id);
     if (p.status === 'green') green++;
     else if (p.status === 'yellow') yellow++;
-    else red++;
+    else if (p.status === 'red') red++;
+    else newCount++;
+
     if (isCardDue(progressMap, c.id)) due++;
   }
-  return { total: cards.length, red, yellow, green, due };
+  return { total: (cards || []).length, newCount, red, yellow, green, due };
 }
 
 export function calculateNextProgress(prevProg, rating) {

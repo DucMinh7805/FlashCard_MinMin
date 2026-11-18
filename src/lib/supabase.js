@@ -9,162 +9,6 @@ export function buildSupabaseHeaders(key, extra = {}) {
   return headers;
 }
 
-async function deleteByIds(base, table, ids, key) {
-  for (let i = 0; i < ids.length; i += 40) {
-    const chunk = ids.slice(i, i + 40);
-    await fetch(`${base}/rest/v1/${table}?id=in.(${chunk.map((id) => `"${id}"`).join(',')})`, {
-      method: 'DELETE',
-      headers: buildSupabaseHeaders(key),
-    });
-  }
-}
-
-/**
- * Push data to Supabase.
- * Supports relational tables (mm_folders, mm_decks, mm_cards) when created,
- * and seamlessly falls back to minmin_store JSON table.
- */
-export async function pushCloudData(url, key, appData) {
-  if (!url || !key) return { ok: false, mode: 'none' };
-  const base = url.replace(/\/$/, '');
-
-  // Always update minmin_store first (already created on user's Supabase)
-  try {
-    const res = await fetch(`${base}/rest/v1/minmin_store`, {
-      method: 'POST',
-      headers: buildSupabaseHeaders(key, {
-        'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates',
-      }),
-      body: JSON.stringify({
-        id: 'shared_drive',
-        payload: appData,
-        updated_at: new Date().toISOString(),
-      }),
-    });
-
-    // Also try syncing relational tables if user ran supabase_schema.sql
-    try {
-      const checkRes = await fetch(`${base}/rest/v1/mm_folders?select=id&limit=1`, {
-        headers: buildSupabaseHeaders(key),
-      });
-      if (checkRes.ok) {
-        // Remove deleted folders/decks from relational tables so they don't resurrect on pull
-        const [exFRes, exDRes] = await Promise.all([
-          fetch(`${base}/rest/v1/mm_folders?select=id`, { headers: buildSupabaseHeaders(key) }),
-          fetch(`${base}/rest/v1/mm_decks?select=id`, { headers: buildSupabaseHeaders(key) }),
-        ]);
-        if (exFRes.ok) {
-          const exF = await exFRes.json();
-          const keepF = new Set(appData.folders.map((f) => f.id));
-          const delF = exF.filter((r) => !keepF.has(r.id)).map((r) => r.id);
-          if (delF.length > 0) {
-            await deleteByIds(base, 'mm_folders', delF, key);
-          }
-        }
-        if (exDRes.ok) {
-          const exD = await exDRes.json();
-          const keepD = new Set(appData.decks.map((d) => d.id));
-          const delD = exD.filter((r) => !keepD.has(r.id)).map((r) => r.id);
-          if (delD.length > 0) {
-            await deleteByIds(base, 'mm_decks', delD, key);
-          }
-        }
-
-        // Remove deleted cards from surviving decks
-        const allCardIds = [];
-        for (const d of appData.decks) {
-          if (Array.isArray(d.cards)) {
-            for (const c of d.cards) {
-              if (c?.id) allCardIds.push(c.id);
-            }
-          }
-        }
-        const keepC = new Set(allCardIds);
-        try {
-          const exCRes = await fetch(`${base}/rest/v1/mm_cards?select=id`, { headers: buildSupabaseHeaders(key) });
-          if (exCRes.ok) {
-            const exC = await exCRes.json();
-            const delC = exC.filter((r) => !keepC.has(r.id)).map((r) => r.id);
-            if (delC.length > 0) {
-              await deleteByIds(base, 'mm_cards', delC, key);
-            }
-          }
-        } catch {
-          // ignore card deletion errors
-        }
-
-        if (appData.folders.length > 0) {
-          await fetch(`${base}/rest/v1/mm_folders`, {
-            method: 'POST',
-            headers: buildSupabaseHeaders(key, {
-              'Content-Type': 'application/json',
-              Prefer: 'resolution=merge-duplicates',
-            }),
-            body: JSON.stringify(
-              appData.folders.map((f) => ({
-                id: f.id,
-                name: f.name,
-                icon: f.icon || '📁',
-                parent_id: f.parentId || null,
-              }))
-            ),
-          });
-        }
-        if (appData.decks.length > 0) {
-          await fetch(`${base}/rest/v1/mm_decks`, {
-            method: 'POST',
-            headers: buildSupabaseHeaders(key, {
-              'Content-Type': 'application/json',
-              Prefer: 'resolution=merge-duplicates',
-            }),
-            body: JSON.stringify(
-              appData.decks.map((d) => ({
-                id: d.id,
-                folder_id: d.folderId || null,
-                name: d.name,
-                updated_at: d.updatedAt || '',
-              }))
-            ),
-          });
-          const allCards = [];
-          for (const d of appData.decks) {
-            d.cards.forEach((c, idx) => {
-              allCards.push({
-                id: c.id,
-                deck_id: d.id,
-                type: c.type || 'basic',
-                front: c.front,
-                back: c.back,
-                hint: c.hint || '',
-                extra: c.extra || '',
-                image: c.image || '',
-                sort_order: idx,
-              });
-            });
-          }
-          if (allCards.length > 0) {
-            await fetch(`${base}/rest/v1/mm_cards`, {
-              method: 'POST',
-              headers: buildSupabaseHeaders(key, {
-                'Content-Type': 'application/json',
-                Prefer: 'resolution=merge-duplicates',
-              }),
-              body: JSON.stringify(allCards),
-            });
-          }
-        }
-      }
-    } catch {
-      // Relational tables optional
-    }
-
-    return { ok: res.ok, mode: 'cloud' };
-  } catch {
-    return { ok: false, mode: 'error' };
-  }
-}
-
 export function normalizeCurriculumData(data) {
   if (!data?.folders) return data;
   const hasOldYkhoa = data.folders.some((f) => f.id === 'fld_ykhoa');
@@ -196,17 +40,216 @@ export function normalizeCurriculumData(data) {
   return { ...data, folders: updatedFolders };
 }
 
+/**
+ * Atomic CRUD: Upsert a single folder in mm_folders
+ */
+export async function atomicUpsertFolder(url, key, folder) {
+  if (!url || !key || !folder) return false;
+  const base = url.replace(/\/$/, '');
+  try {
+    const res = await fetch(`${base}/rest/v1/mm_folders`, {
+      method: 'POST',
+      headers: buildSupabaseHeaders(key, {
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      }),
+      body: JSON.stringify({
+        id: folder.id,
+        name: folder.name,
+        icon: folder.icon || '📁',
+        parent_id: folder.parentId || null,
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Atomic CRUD: Delete a single folder in mm_folders
+ */
+export async function atomicDeleteFolder(url, key, folderId) {
+  if (!url || !key || !folderId) return false;
+  const base = url.replace(/\/$/, '');
+  try {
+    const res = await fetch(`${base}/rest/v1/mm_folders?id=eq.${encodeURIComponent(folderId)}`, {
+      method: 'DELETE',
+      headers: buildSupabaseHeaders(key),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Atomic CRUD: Upsert a deck and its cards into mm_decks & mm_cards
+ */
+export async function atomicUpsertDeckWithCards(url, key, deck, cards = []) {
+  if (!url || !key || !deck) return false;
+  const base = url.replace(/\/$/, '');
+  try {
+    // 1. Upsert deck metadata (name, note, author, folder_id)
+    const deckBody = {
+      id: deck.id,
+      folder_id: deck.folderId || null,
+      name: deck.name,
+      note: deck.note || '',
+      author: deck.author || '',
+      updated_at: deck.updatedAt || new Date().toLocaleDateString('sv-SE'),
+    };
+    await fetch(`${base}/rest/v1/mm_decks`, {
+      method: 'POST',
+      headers: buildSupabaseHeaders(key, {
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      }),
+      body: JSON.stringify(deckBody),
+    });
+
+    // 2. Upsert cards belonging to this deck
+    if (Array.isArray(cards) && cards.length > 0) {
+      const cardPayload = cards.map((c, idx) => ({
+        id: c.id,
+        deck_id: deck.id,
+        type: c.type || 'basic',
+        front: c.front,
+        back: c.back,
+        hint: c.hint || '',
+        extra: c.extra || '',
+        image: c.image || '',
+        sort_order: idx,
+      }));
+      await fetch(`${base}/rest/v1/mm_cards`, {
+        method: 'POST',
+        headers: buildSupabaseHeaders(key, {
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates',
+        }),
+        body: JSON.stringify(cardPayload),
+      });
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Atomic CRUD: Update deck metadata (name, note, author, folderId)
+ */
+export async function atomicUpdateDeckMeta(url, key, deckId, updates = {}) {
+  if (!url || !key || !deckId) return false;
+  const base = url.replace(/\/$/, '');
+  try {
+    const payload = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.note !== undefined) payload.note = updates.note;
+    if (updates.author !== undefined) payload.author = updates.author;
+    if (updates.folderId !== undefined) payload.folder_id = updates.folderId || null;
+    payload.updated_at = new Date().toLocaleDateString('sv-SE');
+
+    const res = await fetch(`${base}/rest/v1/mm_decks?id=eq.${encodeURIComponent(deckId)}`, {
+      method: 'PATCH',
+      headers: buildSupabaseHeaders(key, {
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify(payload),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Atomic CRUD: Delete a deck in mm_decks (CASCADE deletes its mm_cards automatically)
+ */
+export async function atomicDeleteDeck(url, key, deckId) {
+  if (!url || !key || !deckId) return false;
+  const base = url.replace(/\/$/, '');
+  try {
+    const res = await fetch(`${base}/rest/v1/mm_decks?id=eq.${encodeURIComponent(deckId)}`, {
+      method: 'DELETE',
+      headers: buildSupabaseHeaders(key),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Atomic CRUD: Update a single flashcard
+ */
+export async function atomicUpdateCard(url, key, card) {
+  if (!url || !key || !card?.id) return false;
+  const base = url.replace(/\/$/, '');
+  try {
+    const res = await fetch(`${base}/rest/v1/mm_cards?id=eq.${encodeURIComponent(card.id)}`, {
+      method: 'PATCH',
+      headers: buildSupabaseHeaders(key, {
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify({
+        type: card.type || 'basic',
+        front: card.front,
+        back: card.back,
+        hint: card.hint || '',
+        extra: card.extra || '',
+        image: card.image || '',
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Snapshot backup to minmin_store (safety net for offline / full restore)
+ */
+export async function pushCloudData(url, key, appData) {
+  if (!url || !key || !appData) return { ok: false, mode: 'none' };
+  const base = url.replace(/\/$/, '');
+
+  try {
+    const res = await fetch(`${base}/rest/v1/minmin_store`, {
+      method: 'POST',
+      headers: buildSupabaseHeaders(key, {
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      }),
+      body: JSON.stringify({
+        id: 'shared_drive',
+        payload: appData,
+        updated_at: new Date().toISOString(),
+      }),
+    });
+    return { ok: res.ok, mode: 'cloud' };
+  } catch {
+    return { ok: false, mode: 'error' };
+  }
+}
+
+/**
+ * Pull full data from Cloud.
+ * Reads relational tables (mm_folders, mm_decks, mm_cards) first,
+ * falls back to minmin_store.
+ */
 export async function pullCloudData(url, key) {
   if (!url || !key) return null;
   const base = url.replace(/\/$/, '');
 
-  // Try relational tables first if available and populated
+  // 1. Try relational tables
   try {
     const [fRes, dRes, cRes] = await Promise.all([
       fetch(`${base}/rest/v1/mm_folders?select=*`, { headers: buildSupabaseHeaders(key) }),
       fetch(`${base}/rest/v1/mm_decks?select=*`, { headers: buildSupabaseHeaders(key) }),
       fetch(`${base}/rest/v1/mm_cards?select=*&order=sort_order.asc`, { headers: buildSupabaseHeaders(key) }),
     ]);
+
     if (fRes.ok && dRes.ok && cRes.ok) {
       const [folders, decks, cards] = await Promise.all([fRes.json(), dRes.json(), cRes.json()]);
       if (Array.isArray(folders) && Array.isArray(decks) && (folders.length > 0 || decks.length > 0)) {
@@ -234,6 +277,8 @@ export async function pullCloudData(url, key) {
             id: d.id,
             folderId: d.folder_id || null,
             name: d.name,
+            note: d.note || '',
+            author: d.author || '',
             updatedAt: d.updated_at || '',
             cards: cardsByDeck[d.id] || [],
           })),
@@ -241,16 +286,17 @@ export async function pullCloudData(url, key) {
       }
     }
   } catch {
-    // Fallback to minmin_store
+    // Relational read failed, fall through to minmin_store
   }
 
+  // 2. Fallback to minmin_store
   try {
     const res = await fetch(`${base}/rest/v1/minmin_store?id=eq.shared_drive&select=payload`, {
       headers: buildSupabaseHeaders(key),
     });
     if (!res.ok) return null;
     const data = await res.json();
-    if (Array.isArray(data) && data[0] && data[0].payload && Array.isArray(data[0].payload.folders)) {
+    if (Array.isArray(data) && data[0]?.payload && Array.isArray(data[0].payload.folders)) {
       return normalizeCurriculumData(data[0].payload);
     }
     return null;

@@ -252,11 +252,11 @@ export default function AnalyticsModal({
 
                 {/* Progress bar */}
                 <div className="w-full h-2 rounded-full bg-slate-200/80 overflow-hidden flex shadow-inner">
-                  {stats.total > 0 && stats.red > 0 && (
+                  {stats.total > 0 && stats.green > 0 && (
                     <div
-                      style={{ width: `${(stats.red / stats.total) * 100}%` }}
-                      className="bg-rose-500 h-full shrink-0"
-                      title={`Chưa nhớ: ${stats.red}`}
+                      style={{ width: `${(stats.green / stats.total) * 100}%` }}
+                      className="bg-emerald-500 h-full shrink-0"
+                      title={`Đã thuộc: ${stats.green}`}
                     />
                   )}
                   {stats.total > 0 && stats.yellow > 0 && (
@@ -266,22 +266,32 @@ export default function AnalyticsModal({
                       title={`Tạm hiểu: ${stats.yellow}`}
                     />
                   )}
-                  {stats.total > 0 && stats.green > 0 && (
+                  {stats.total > 0 && stats.red > 0 && (
                     <div
-                      style={{ width: `${(stats.green / stats.total) * 100}%` }}
-                      className="bg-emerald-500 h-full shrink-0"
-                      title={`Đã thuộc: ${stats.green}`}
+                      style={{ width: `${(stats.red / stats.total) * 100}%` }}
+                      className="bg-rose-500 h-full shrink-0"
+                      title={`Chưa nhớ: ${stats.red}`}
+                    />
+                  )}
+                  {stats.total > 0 && (stats.newCount || 0) > 0 && (
+                    <div
+                      style={{ width: `${((stats.newCount || 0) / stats.total) * 100}%` }}
+                      className="bg-slate-300 h-full shrink-0"
+                      title={`Chưa học: ${stats.newCount || 0}`}
                     />
                   )}
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] text-slate-500">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-rose-600 font-medium">● {stats.red} Chưa nhớ</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-emerald-600 font-medium">● {stats.green} Thuộc</span>
                     <span className="text-amber-600 font-medium">● {stats.yellow} Tạm hiểu</span>
-                    <span className="text-emerald-600 font-medium">● {stats.green} Đã thuộc</span>
+                    <span className="text-rose-600 font-medium">● {stats.red} Chưa nhớ</span>
+                    {(stats.newCount || 0) > 0 && (
+                      <span className="text-slate-400 font-medium">● {stats.newCount} Mới</span>
+                    )}
                   </div>
-                  <span>Đến hạn: <strong className="text-slate-700">{stats.due} thẻ</strong></span>
+                  <span>Cần ôn: <strong className="text-slate-700">{stats.due} thẻ</strong></span>
                 </div>
               </div>
             ))}

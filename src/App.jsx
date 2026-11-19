@@ -287,10 +287,15 @@ export default function App() {
   }, [resolveHash, appData]);
 
   useEffect(() => {
-    const handleHashChange = () => resolveHash(appDataRef.current);
+    const handleHashChange = () => {
+      if (isModalOpenRef.current && window.location.hash !== '#modal') {
+        closeAllModals();
+      }
+      resolveHash(appDataRef.current);
+    };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [resolveHash]);
+  }, [closeAllModals, resolveHash]);
 
   const startStudySession = ({
     title,

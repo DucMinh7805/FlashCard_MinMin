@@ -657,54 +657,7 @@ export default function StudyView({
 
 
 
-      {/* BOTTOM ACTION BAR: Tích hợp trực tiếp vào flex flow ở đáy, không dùng fixed để chống tràn màn hình */}
-      {!isComplete && card && (
-        <div className="shrink-0 w-full max-w-2xl mx-auto pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
-          {session.isFlipped ? (
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => onRate('red')}
-                className="rounded-2xl p-2 sm:p-2.5 text-center bg-rose-50/95 border border-rose-200/90 text-rose-700 hover:bg-rose-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5 cursor-pointer"
-              >
-                <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-rose-500" /> Chưa nhớ
-                </span>
-                <span className="text-[10px] text-rose-500">Vuốt trái</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onRate('yellow')}
-                className="rounded-2xl p-2 sm:p-2.5 text-center bg-amber-50/95 border border-amber-200/90 text-amber-800 hover:bg-amber-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5 cursor-pointer ring-2 ring-amber-400/50"
-              >
-                <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-amber-500" /> Tạm hiểu
-                </span>
-                <span className="text-[10px] text-amber-600 font-semibold">Chạm để chọn</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onRate('green')}
-                className="rounded-2xl p-2 sm:p-2.5 text-center bg-emerald-50/95 border border-emerald-200/90 text-emerald-800 hover:bg-emerald-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5 cursor-pointer"
-              >
-                <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> Đã thuộc
-                </span>
-                <span className="text-[10px] text-emerald-600">Vuốt phải</span>
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={triggerFlip}
-              className="w-full py-2.5 sm:py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 active:scale-[0.98] text-white font-bold text-xs sm:text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <RotateCw className="w-4 h-4" />
-              <span>Chạm thẻ hoặc bấm vào đây để lật đáp án</span>
-            </button>
-          )}
-        </div>
-      )}
+
 
       {/* iOS-STYLE ACTION SHEET (Mounted at root z-50 to completely prevent Stacking Context traps) */}
       {optionsOpen && (

@@ -117,9 +117,9 @@ export default function App() {
     }
   }, []);
 
-  // Modal History Helpers: push state directly when opening
+  // Modal History Helpers: push state with explicit #modal hash for 100% mobile back compatibility
   const pushModalHistory = () => {
-    window.history.pushState({ minmin: 'modal' }, '');
+    window.history.pushState({ minmin: 'modal' }, '', '#modal');
   };
 
   const openImport = () => {
@@ -160,6 +160,13 @@ export default function App() {
     setSelectedFolderForAction(null);
     setSelectedDeckForAction(null);
     setEditingCard(null);
+
+    // If URL hash was set to #modal, restore clean folder/root hash without polluting history
+    if (window.location.hash === '#modal') {
+      const folderId = currentFolderIdRef.current;
+      const nextHash = folderId ? `#folder=${encodeURIComponent(folderId)}` : '';
+      window.history.replaceState({ minmin: folderId ? 'folder' : 'root', folderId }, '', window.location.pathname + nextHash);
+    }
   }, []);
 
   // Study Session Exit: updates UI state and URL hash without calling history.back()
@@ -252,7 +259,7 @@ export default function App() {
   const resolveHash = useCallback(
     (sourceData) => {
       const hash = window.location.hash || '';
-      if (!hash) return false;
+      if (!hash || hash === '#modal') return false;
       const data = sourceData || appDataRef.current;
       if (!data) return false;
 

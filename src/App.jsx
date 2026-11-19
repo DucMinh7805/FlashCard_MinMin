@@ -79,6 +79,7 @@ export default function App() {
     settings,
     updateSettings,
     resetProgress,
+    restoreSeedData,
     isCloudSyncing,
     syncFromCloud,
     getFolderPath,
@@ -253,7 +254,7 @@ export default function App() {
       setUndoStack([]);
       safeSet(STORAGE_KEY_SESSION, nextSession);
       setResumeCandidate(nextSession);
-      window.history.replaceState(
+      window.history.pushState(
         { view: 'study', folderId: deck.folderId || null },
         '',
         `#deck=${encodeURIComponent(deck.id)}`
@@ -628,6 +629,7 @@ export default function App() {
         onUpdateSettings={updateSettings}
         onPullCloud={() => syncFromCloud(false)}
         onResetProgress={resetProgress}
+        onRestoreSeedData={restoreSeedData}
         editorMode={editorMode}
         setEditorMode={(mode) => (mode ? openEditor(mode) : handleCloseModal())}
         editingCard={editingCard}

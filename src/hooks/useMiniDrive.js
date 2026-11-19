@@ -55,14 +55,15 @@ export function getAllDescendantFolderIds(rootFolderId, allFolders) {
 export function useMiniDrive({ showToast, hasActiveSession }) {
   const [appData, setAppData] = useState(() => {
     const saved = safeGet(STORAGE_KEY_CONTENT, null);
-    if (saved?.folders && saved?.decks && (saved.folders.length > 0 || saved.decks.length > 0)) {
-      const normalized = normalizeCurriculumData(saved);
-      safeSet(STORAGE_KEY_CONTENT, normalized);
-      return normalized;
+    const totalCards = (saved?.decks || []).reduce((sum, d) => sum + (d.cards?.length || 0), 0);
+    if (!saved?.folders?.length || !saved?.decks?.length || totalCards === 0) {
+      const initial = { folders: DEFAULT_FOLDERS, decks: DEFAULT_DECKS };
+      safeSet(STORAGE_KEY_CONTENT, initial);
+      return initial;
     }
-    const initial = { folders: DEFAULT_FOLDERS, decks: DEFAULT_DECKS };
-    safeSet(STORAGE_KEY_CONTENT, initial);
-    return initial;
+    const normalized = normalizeCurriculumData(saved);
+    safeSet(STORAGE_KEY_CONTENT, normalized);
+    return normalized;
   });
 
   const [progressMap, setProgressMap] = useState(() => safeGet(STORAGE_KEY_PROGRESS, {}));
@@ -89,7 +90,22 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
       setIsCloudSyncing(true);
       try {
         const rawCloud = await pullCloudData(settings.supabaseUrl, settings.supabaseKey);
+        const cloudCards = (rawCloud?.decks || []).reduce((sum, d) => sum + (d.cards?.length || 0), 0);
         if (rawCloud && (rawCloud.folders?.length > 0 || rawCloud.decks?.length > 0)) {
+          if (cloudCards === 0) {
+            // Cloud has empty decks/cards - auto re-seed cloud with default curriculum
+            const initial = { folders: DEFAULT_FOLDERS, decks: DEFAULT_DECKS };
+            setAppData(initial);
+            safeSet(STORAGE_KEY_CONTENT, initial);
+            for (const f of DEFAULT_FOLDERS) {
+              atomicUpsertFolder(settings.supabaseUrl, settings.supabaseKey, f);
+            }
+            for (const d of DEFAULT_DECKS) {
+              atomicUpsertDeckWithCards(settings.supabaseUrl, settings.supabaseKey, d, d.cards);
+            }
+            pushCloudData(settings.supabaseUrl, settings.supabaseKey, initial);
+            return;
+          }
           const cloud = normalizeCurriculumData(rawCloud);
           setAppData(cloud);
           safeSet(STORAGE_KEY_CONTENT, cloud);
@@ -406,6 +422,25 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
     showToast('Đã đặt lại toàn bộ tiến độ về Chưa học.');
   };
 
+  const restoreSeedData = async () => {
+    const initial = { folders: DEFAULT_FOLDERS, decks: DEFAULT_DECKS };
+    setAppData(initial);
+    safeSet(STORAGE_KEY_CONTENT, initial);
+    showToast('Đang khôi phục 7 học phần & 46 thẻ mẫu lên Cloud...');
+    try {
+      for (const f of DEFAULT_FOLDERS) {
+        await atomicUpsertFolder(settings.supabaseUrl, settings.supabaseKey, f);
+      }
+      for (const d of DEFAULT_DECKS) {
+        await atomicUpsertDeckWithCards(settings.supabaseUrl, settings.supabaseKey, d, d.cards);
+      }
+      await pushCloudData(settings.supabaseUrl, settings.supabaseKey, initial);
+      showToast('✅ Đã khôi phục thành công 7 học phần và 46 thẻ mẫu Y khoa!');
+    } catch {
+      showToast('Đã khôi phục trên máy, đang chờ kết nối lại Cloud.');
+    }
+  };
+
   return {
     appData,
     setAppData,
@@ -417,6 +452,7 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
     setSettings,
     updateSettings,
     resetProgress,
+    restoreSeedData,
     isCloudSyncing,
     syncFromCloud,
     getFolderPath,

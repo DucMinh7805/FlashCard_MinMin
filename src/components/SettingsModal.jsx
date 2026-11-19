@@ -25,6 +25,7 @@ export default function SettingsModal({
   onExportUserProgress,
   onRestoreUserProgress,
   onResetProgress,
+  onRestoreSeedData,
   showToast,
 }) {
   const [studentName, setStudentName] = useState(settings.studentName || 'Học viên');
@@ -203,6 +204,21 @@ export default function SettingsModal({
               <span>Khôi phục Drive từ file</span>
               <input type="file" accept=".json" onChange={onRestoreBackup} className="hidden" />
             </label>
+          </div>
+
+          <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between gap-2">
+            <div>
+              <span className="block text-xs font-bold text-slate-800">Khôi phục 46 thẻ mẫu Y khoa</span>
+              <span className="text-[11px] text-slate-500">Nạp lại 7 học phần & 46 thẻ mẫu chuẩn lên máy và Cloud</span>
+            </div>
+            <button
+              type="button"
+              onClick={onRestoreSeedData}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 transition flex items-center gap-1.5 active:scale-95 shrink-0"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-sky-600" />
+              <span>Khôi phục 46 thẻ mẫu</span>
+            </button>
           </div>
 
           <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">

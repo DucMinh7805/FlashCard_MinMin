@@ -35,6 +35,7 @@ export default function AppModals({
   onUpdateSettings,
   onPullCloud,
   onResetProgress,
+  onRestoreSeedData,
   // Editor
   editorMode,
   setEditorMode,
@@ -201,6 +202,7 @@ export default function AppModals({
           reader.readAsText(file, 'utf-8');
         }}
         onResetProgress={onResetProgress}
+        onRestoreSeedData={onRestoreSeedData}
       />
 
       <AnalyticsModal

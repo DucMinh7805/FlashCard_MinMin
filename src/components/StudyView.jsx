@@ -70,6 +70,20 @@ export default function StudyView({
   const isPointerDownRef = useRef(false);
   const hasMovedRef = useRef(false);
   const lastFlipTimeRef = useRef(0);
+  const wasSwipeRef = useRef(false);
+  const cardScrollRef = useRef(null);
+  const rafRef = useRef(null);
+
+  const isContentScrollable = () => {
+    if (!cardScrollRef.current) return false;
+    return cardScrollRef.current.scrollHeight > cardScrollRef.current.clientHeight + 8;
+  };
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
 
   const triggerFlip = () => {
     const now = Date.now();
@@ -95,6 +109,7 @@ export default function StudyView({
 
   const triggerSwipe = (dir, rateColor) => {
     if (exitDirection) return;
+    wasSwipeRef.current = true;
     setExitDirection(dir);
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       try {
@@ -114,22 +129,30 @@ export default function StudyView({
       setIsDragging(false);
       isPointerDownRef.current = false;
       hasMovedRef.current = false;
+      setTimeout(() => {
+        wasSwipeRef.current = false;
+      }, 250);
     }, 180);
   };
 
   const handlePointerDown = (e) => {
     if (exitDirection) return;
-    // Bỏ qua nếu người dùng ấn vào các nút con (Button xem Gợi ý, Phóng to ảnh...)
+
+    // 1. Tránh xung đột mép trái iOS Safari / PWA Back gesture (< 28px hoặc > width - 20px)
+    const clientX = e.clientX ?? (e.touches ? e.touches[0].clientX : 0);
+    if (clientX < 28 || (typeof window !== 'undefined' && clientX > window.innerWidth - 20)) {
+      return;
+    }
+
+    // 2. Bỏ qua nếu người dùng ấn vào các nút con (Button xem Gợi ý, Phóng to ảnh...)
     if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.no-drag')) {
       return;
     }
+
     dragStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
     dragCurrentRef.current = { x: e.clientX, y: e.clientY };
     isPointerDownRef.current = true;
     hasMovedRef.current = false;
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch (_) {}
   };
 
   const handlePointerMove = (e) => {
@@ -138,41 +161,59 @@ export default function StudyView({
     const dy = e.clientY - dragStartRef.current.y;
     dragCurrentRef.current = { x: e.clientX, y: e.clientY };
 
-    if (!hasMovedRef.current && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+    const scrollable = isContentScrollable();
+
+    // 3. Xung đột thẻ Y khoa dài:
+    // Nếu thẻ có nội dung dài (bị tràn chiều cao) và cử chỉ ngón tay thiên về cuộn dọc:
+    // Nhường 100% cho việc cuộn đọc văn bản mượt mà, không drag thẻ!
+    if (scrollable && Math.abs(dy) > Math.abs(dx)) {
+      if (isDragging) {
+        setIsDragging(false);
+        setDragOffset({ x: 0, y: 0 });
+      }
+      return;
+    }
+
+    if (!hasMovedRef.current && (Math.abs(dx) > 6 || (!scrollable && Math.abs(dy) > 6))) {
       hasMovedRef.current = true;
       setIsDragging(true);
     }
 
     if (hasMovedRef.current) {
-      setDragOffset({ x: dx, y: dy });
+      // 90fps / 120fps hardware sync qua requestAnimationFrame
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        setDragOffset({ x: dx, y: scrollable ? 0 : dy });
+      });
     }
   };
 
-  const handlePointerUp = (e) => {
+  const handlePointerUp = () => {
     if (!isPointerDownRef.current) return;
     isPointerDownRef.current = false;
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch (_) {}
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
 
     const dx = dragCurrentRef.current.x - dragStartRef.current.x;
     const dy = dragCurrentRef.current.y - dragStartRef.current.y;
     const dist = Math.hypot(dx, dy);
     const wasDragging = hasMovedRef.current;
+    const scrollable = isContentScrollable();
 
     setDragOffset({ x: 0, y: 0 });
     setIsDragging(false);
     hasMovedRef.current = false;
 
-    // Chạm (Tap nhẹ): không kéo hoặc khoảng cách dịch chuyển nhỏ (< 25px) -> Lật thẻ ngay!
-    if (!wasDragging || dist < 25) {
+    // Chạm (Tap nhẹ): không kéo hoặc khoảng cách dịch chuyển nhỏ (< 30px) -> Lật thẻ ngay!
+    if (!wasDragging || dist < 30) {
       triggerFlip();
       return;
     }
 
     // Vuốt thẻ (Swipe): khoảng cách vuốt rõ ràng (>= 50px)
     const SWIPE_THRESHOLD = 50;
-    if (Math.abs(dx) > Math.abs(dy)) {
+
+    // Vuốt ngang (Ưu tiên số 1): Trái = Chưa nhớ, Phải = Đã thuộc
+    if (Math.abs(dx) >= Math.abs(dy)) {
       if (dx > SWIPE_THRESHOLD) {
         triggerSwipe('right', 'green'); // Vuốt phải -> Đã thuộc
         return;
@@ -181,7 +222,8 @@ export default function StudyView({
         triggerSwipe('left', 'red'); // Vuốt trái -> Chưa nhớ
         return;
       }
-    } else {
+    } else if (!scrollable) {
+      // Chỉ cho phép vuốt dọc chấm Tạm hiểu khi thẻ NGẮN (không có thanh cuộn)
       if (dy < -SWIPE_THRESHOLD) {
         triggerSwipe('up', 'yellow'); // Vuốt lên -> Tạm hiểu
         return;
@@ -191,16 +233,12 @@ export default function StudyView({
         return;
       }
     }
-
-    // Khoảng cách lỡ cỡ (25-50px) -> đàn hồi trở lại vị trí gốc
   };
 
-  const handlePointerCancel = (e) => {
+  const handlePointerCancel = () => {
     if (!isPointerDownRef.current) return;
     isPointerDownRef.current = false;
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch (_) {}
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
     setDragOffset({ x: 0, y: 0 });
     setIsDragging(false);
     hasMovedRef.current = false;
@@ -340,21 +378,21 @@ export default function StudyView({
 
       {/* Swipe Gesture & Tap Hint bar */}
       {!isComplete && card && (
-        <div className="flex items-center justify-between px-2 text-[11px] text-slate-500 font-medium select-none shrink-0 min-h-[20px]">
+        <div className="flex items-center justify-between px-2 text-[10px] sm:text-[11px] text-slate-500 font-medium select-none shrink-0 min-h-[20px]">
           {session.isFlipped ? (
-            <>
-              <span className="flex items-center gap-1 text-rose-600 font-semibold">
+            <div className="w-full flex items-center justify-between text-[11px] font-semibold select-none">
+              <span className="flex items-center gap-1 text-rose-600">
                 <span>←</span> Vuốt trái: Chưa nhớ
               </span>
-              <span className="flex items-center gap-1 text-amber-700 font-semibold">
+              <span className="flex items-center gap-1 text-amber-700">
                 <span>↕</span> Lên/Xuống: Tạm hiểu
               </span>
-              <span className="flex items-center gap-1 text-emerald-700 font-semibold">
+              <span className="flex items-center gap-1 text-emerald-700">
                 Vuốt phải: Đã thuộc <span>→</span>
               </span>
-            </>
+            </div>
           ) : (
-            <div className="w-full text-center text-slate-400 font-medium flex items-center justify-center gap-1.5 animate-pulse">
+            <div className="w-full text-center text-slate-500 font-medium flex items-center justify-center gap-1.5 text-xs animate-pulse">
               <span>👆</span>
               <span>Chạm thẻ để xem đáp án • Phím Cách (Space)</span>
             </div>
@@ -365,18 +403,26 @@ export default function StudyView({
       {/* Main Flashcard Card: Tràn đầy khoảng trống, căn giữa nội dung, chạm để lật và hỗ trợ vuốt Swipe 4 hướng */}
       {!isComplete && card ? (
         <div
+          onClick={(e) => {
+            if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.no-drag')) return;
+            if (wasSwipeRef.current) return;
+            triggerFlip();
+          }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerCancel}
           style={{
-            transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) rotate(${dragOffset.x * 0.08}deg)`,
+            transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) rotate(${dragOffset.x * 0.065}deg)`,
             transition: isDragging
               ? 'none'
-              : 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease',
-            opacity: exitDirection ? 0.3 : 1,
+              : 'transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28), opacity 0.18s ease',
+            opacity: exitDirection ? 0.2 : 1,
+            willChange: 'transform, opacity',
+            WebkitBackfaceVisibility: 'hidden',
+            backfaceVisibility: 'hidden',
           }}
-          className="glass-panel rounded-3xl p-4 sm:p-7 flex-1 min-h-0 flex flex-col justify-between select-none shadow-lg relative overflow-hidden touch-none cursor-pointer border border-white/90 active:scale-[0.995] transition-transform"
+          className="glass-panel rounded-3xl p-4 sm:p-7 flex-1 min-h-0 flex flex-col justify-between select-none shadow-lg relative overflow-hidden cursor-pointer border border-white/90 active:scale-[0.995] transition-transform"
         >
           {/* Stamps phản hồi thị giác khi vuốt */}
           {((dragOffset.x > 25 && !exitDirection) || exitDirection === 'right') && (
@@ -430,8 +476,11 @@ export default function StudyView({
             </span>
           </div>
 
-          {/* Card Scrollable Content Area: Căn giữa nội dung, lấp đầy không gian */}
-          <div className="my-auto py-2 space-y-3 max-h-full overflow-y-auto px-1 pr-1.5 flex flex-col justify-center">
+          {/* Card Scrollable Content Area: touch-pan-y giữ nguyên cuộn dọc 100% khi thẻ Y khoa dài */}
+          <div
+            ref={cardScrollRef}
+            className="my-auto py-2 space-y-3 max-h-full overflow-y-auto px-1 pr-1.5 flex flex-col justify-center touch-pan-y overscroll-contain select-text"
+          >
             <div className={`space-y-2 ${isCaseOrLong ? 'text-left' : 'text-center'}`}>
               <p className="text-[11px] uppercase tracking-widest text-sky-600 font-bold">
                 {card.type === 'cloze'
@@ -606,41 +655,54 @@ export default function StudyView({
         </div>
       )}
 
-      {/* BOTTOM ACTION BAR: Chỉ hiện sau khi đã lật thẻ để đánh giá 3 màu (Chưa nhớ / Tạm hiểu / Đã thuộc). Khi chưa lật thì ẩn hoàn toàn theo yêu cầu */}
-      {!isComplete && card && session.isFlipped && (
-        <div className="shrink-0 w-full max-w-2xl mx-auto pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] animate-fadeIn">
-          <div className="grid grid-cols-3 gap-2">
+
+
+      {/* BOTTOM ACTION BAR: Tích hợp trực tiếp vào flex flow ở đáy, không dùng fixed để chống tràn màn hình */}
+      {!isComplete && card && (
+        <div className="shrink-0 w-full max-w-2xl mx-auto pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+          {session.isFlipped ? (
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => onRate('red')}
+                className="rounded-2xl p-2 sm:p-2.5 text-center bg-rose-50/95 border border-rose-200/90 text-rose-700 hover:bg-rose-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5 cursor-pointer"
+              >
+                <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-rose-500" /> Chưa nhớ
+                </span>
+                <span className="text-[10px] text-rose-500">Vuốt trái</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onRate('yellow')}
+                className="rounded-2xl p-2 sm:p-2.5 text-center bg-amber-50/95 border border-amber-200/90 text-amber-800 hover:bg-amber-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5 cursor-pointer ring-2 ring-amber-400/50"
+              >
+                <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" /> Tạm hiểu
+                </span>
+                <span className="text-[10px] text-amber-600 font-semibold">Chạm để chọn</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onRate('green')}
+                className="rounded-2xl p-2 sm:p-2.5 text-center bg-emerald-50/95 border border-emerald-200/90 text-emerald-800 hover:bg-emerald-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5 cursor-pointer"
+              >
+                <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> Đã thuộc
+                </span>
+                <span className="text-[10px] text-emerald-600">Vuốt phải</span>
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
-              onClick={() => onRate('red')}
-              className="rounded-2xl p-2 sm:p-2.5 text-center bg-rose-50/95 border border-rose-200/90 text-rose-700 hover:bg-rose-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5 cursor-pointer"
+              onClick={triggerFlip}
+              className="w-full py-2.5 sm:py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 active:scale-[0.98] text-white font-bold text-xs sm:text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-rose-500" /> Chưa nhớ
-              </span>
-              <span className="text-[10px] text-rose-500">Vuốt trái</span>
+              <RotateCw className="w-4 h-4" />
+              <span>Chạm thẻ hoặc bấm vào đây để lật đáp án</span>
             </button>
-            <button
-              type="button"
-              onClick={() => onRate('yellow')}
-              className="rounded-2xl p-2 sm:p-2.5 text-center bg-amber-50/95 border border-amber-200/90 text-amber-800 hover:bg-amber-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5 cursor-pointer"
-            >
-              <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-amber-500" /> Tạm hiểu
-              </span>
-              <span className="text-[10px] text-amber-600">Vuốt lên / xuống</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onRate('green')}
-              className="rounded-2xl p-2 sm:p-2.5 text-center bg-emerald-50/95 border border-emerald-200/90 text-emerald-800 hover:bg-emerald-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5 cursor-pointer"
-            >
-              <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" /> Đã thuộc
-              </span>
-              <span className="text-[10px] text-emerald-600">Vuốt phải</span>
-            </button>
-          </div>
+          )}
         </div>
       )}
 

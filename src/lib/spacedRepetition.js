@@ -68,7 +68,7 @@ export function computeStudyStreak(activityLogs = {}) {
     checkDate.setDate(checkDate.getDate() - 1);
   }
 
-  while (true) {
+  while (streak < 730) {
     const key = checkDate.toLocaleDateString('sv-SE');
     if (activityLogs[key] && activityLogs[key] > 0) {
       streak++;

@@ -32,8 +32,15 @@ export function safeGet(key, fallback) {
 export function safeSet(key, val) {
   try {
     localStorage.setItem(key, JSON.stringify(val));
-  } catch {
-    // Ignore quota errors
+  } catch (err) {
+    if (err && (err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
+      console.warn('LocalStorage quota exceeded for key:', key);
+      try {
+        window.dispatchEvent(new CustomEvent('minmin_quota_error', { detail: { key } }));
+      } catch {
+        // Ignore in non-window environments
+      }
+    }
   }
 }
 
@@ -97,25 +104,25 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
             const initial = { folders: DEFAULT_FOLDERS, decks: DEFAULT_DECKS };
             setAppData(initial);
             safeSet(STORAGE_KEY_CONTENT, initial);
+            pushCloudData(settings.supabaseUrl, settings.supabaseKey, initial);
             for (const f of DEFAULT_FOLDERS) {
               atomicUpsertFolder(settings.supabaseUrl, settings.supabaseKey, f);
             }
             for (const d of DEFAULT_DECKS) {
               atomicUpsertDeckWithCards(settings.supabaseUrl, settings.supabaseKey, d, d.cards);
             }
-            pushCloudData(settings.supabaseUrl, settings.supabaseKey, initial);
-            return;
+          } else {
+            const cloud = normalizeCurriculumData(rawCloud);
+            setAppData(cloud);
+            safeSet(STORAGE_KEY_CONTENT, cloud);
+            if (!isSilent) showToast('⬇ Đã đồng bộ kho bài học mới nhất từ Cloud!');
           }
-          const cloud = normalizeCurriculumData(rawCloud);
-          setAppData(cloud);
-          safeSet(STORAGE_KEY_CONTENT, cloud);
-          if (!isSilent) showToast('⬇ Đã đồng bộ kho bài học mới nhất từ Cloud!');
         }
       } catch {
         // Ignore background network issues
       } finally {
         isSyncingRef.current = false;
-        setTimeout(() => setIsCloudSyncing(false), 500);
+        setIsCloudSyncing(false);
       }
     },
     [settings.supabaseUrl, settings.supabaseKey, showToast]

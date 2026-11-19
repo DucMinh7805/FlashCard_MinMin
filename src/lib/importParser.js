@@ -1,10 +1,17 @@
-export function normalizeCardObject(raw, idx) {
+function generateCardId(prefix = 'card', idx = 0) {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return `${prefix}_${crypto.randomUUID()}`;
+  }
+  return `${prefix}_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function normalizeCardObject(raw, idx = 0) {
   if (!raw || !raw.front) return null;
   const front = String(raw.front).trim();
   const back = String(raw.back || '').trim();
   const isCloze = /\{\{c\d+::.*?\}\}/.test(front);
   return {
-    id: raw.id || `card_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 5)}`,
+    id: raw.id || generateCardId('card', idx),
     type: raw.type || (isCloze ? 'cloze' : 'basic'),
     front,
     back: back || front,
@@ -80,22 +87,23 @@ export function parseImportInput(rawText) {
     } else if (line.includes('\t')) {
       parts = line.split('\t').map((p) => p.trim());
     } else {
-      // Quote-aware CSV splitter: handles commas inside quotation marks "..."
+      // Quote-aware CSV splitter: handles commas inside quotation marks "..." and escaped quotes \"
       parts = [];
       let current = '';
       let inQuotes = false;
       for (let c = 0; c < line.length; c++) {
         const ch = line[c];
-        if (ch === '"' || ch === "'") {
+        const isEscaped = c > 0 && line[c - 1] === '\\';
+        if ((ch === '"' || ch === "'") && !isEscaped) {
           inQuotes = !inQuotes;
         } else if (ch === ',' && !inQuotes) {
-          parts.push(current.trim().replace(/^["']|["']$/g, ''));
+          parts.push(current.trim().replace(/^["']|["']$/g, '').replace(/\\"/g, '"'));
           current = '';
         } else {
           current += ch;
         }
       }
-      parts.push(current.trim().replace(/^["']|["']$/g, ''));
+      parts.push(current.trim().replace(/^["']|["']$/g, '').replace(/\\"/g, '"'));
     }
 
     if (parts.length >= 2 && parts[0] && parts[1]) {
@@ -105,7 +113,7 @@ export function parseImportInput(rawText) {
       const extra = parts[3] || '';
       const isCloze = /\{\{c\d+::.*?\}\}/.test(front);
       cards.push({
-        id: `card_${Date.now()}_${i}`,
+        id: generateCardId('card', i),
         type: isCloze ? 'cloze' : 'basic',
         front,
         back,

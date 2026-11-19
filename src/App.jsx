@@ -17,11 +17,21 @@ import { calculateNextProgress, getCardProgress, isCardDue } from './lib/spacedR
 
 export default function App() {
   const [toastMsg, setToastMsg] = useState('');
+  const toastTimerRef = useRef(null);
   const showToast = useCallback((msg) => {
     setToastMsg(msg);
-    clearTimeout(window.__minminToast);
-    window.__minminToast = setTimeout(() => setToastMsg(''), 2800);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToastMsg(''), 2800);
   }, []);
+
+  // Listen for storage quota warnings
+  useEffect(() => {
+    const handleQuotaErr = () => {
+      showToast('Bộ nhớ trình duyệt (LocalStorage) đầy! Hãy vào Cài đặt để sao lưu.');
+    };
+    window.addEventListener('minmin_quota_error', handleQuotaErr);
+    return () => window.removeEventListener('minmin_quota_error', handleQuotaErr);
+  }, [showToast]);
 
   const [activeSession, setActiveSession] = useState(null);
   const [resumeCandidate, setResumeCandidate] = useState(() => {
@@ -56,7 +66,15 @@ export default function App() {
   const activeSessionRef = useRef(activeSession);
   activeSessionRef.current = activeSession;
 
-  const isModalOpen = !!(importOpen || promptOpen || analyticsOpen || thesisDocsOpen || settingsOpen || editorMode);
+  const isModalOpen = !!(
+    importOpen ||
+    promptOpen ||
+    analyticsOpen ||
+    thesisDocsOpen ||
+    settingsOpen ||
+    editorMode ||
+    plusMenuOpen
+  );
   const isModalOpenRef = useRef(isModalOpen);
   isModalOpenRef.current = isModalOpen;
 
@@ -151,6 +169,7 @@ export default function App() {
   };
 
   const closeAllModals = useCallback(() => {
+    setPlusMenuOpen(false);
     setImportOpen(false);
     setPromptOpen(false);
     setAnalyticsOpen(false);
@@ -246,7 +265,7 @@ export default function App() {
       safeSet(STORAGE_KEY_SESSION, nextSession);
       setResumeCandidate(nextSession);
       window.history.pushState(
-        { view: 'study', folderId: deck.folderId || null },
+        { minmin: 'study', folderId: deck.folderId || null },
         '',
         `#deck=${encodeURIComponent(deck.id)}`
       );
@@ -273,7 +292,7 @@ export default function App() {
         const fid = decodeURIComponent(hash.slice('#folder='.length));
         if (data.folders?.some((f) => f.id === fid)) {
           setCurrentFolderId(fid);
-          window.history.replaceState({ view: 'folder', folderId: fid }, '', window.location.hash);
+          window.history.replaceState({ minmin: 'folder', folderId: fid }, '', window.location.hash);
           return true;
         }
       }
@@ -282,8 +301,15 @@ export default function App() {
     [openDeckDirectly]
   );
 
+  // Run hash resolution only ONCE on initial load, do not spam/reset study on 25s cloud sync
+  const hasResolvedInitialHashRef = useRef(false);
   useEffect(() => {
-    resolveHash(appData);
+    if (!hasResolvedInitialHashRef.current && (appData.decks?.length > 0 || appData.folders?.length > 0)) {
+      const resolved = resolveHash(appData);
+      if (resolved) {
+        hasResolvedInitialHashRef.current = true;
+      }
+    }
   }, [resolveHash, appData]);
 
   useEffect(() => {
@@ -306,7 +332,7 @@ export default function App() {
   }) => {
     if (resumeState) {
       window.history.pushState(
-        { view: 'study', folderId: currentFolderIdRef.current },
+        { minmin: 'study', folderId: currentFolderIdRef.current },
         '',
         resumeState.deckIds?.[0] ? `#deck=${encodeURIComponent(resumeState.deckIds[0])}` : '#study'
       );
@@ -318,7 +344,7 @@ export default function App() {
     if (allCards.length === 0) return showToast('Chưa có thẻ nào trong mục này để học!');
 
     let filtered = allCards.slice();
-    if (filterMode === 'due') {
+    if (filterMode === 'due' || filterMode === 'due_only') {
       filtered = allCards.filter((c) => isCardDue(progressMap, c.id));
     } else if (filterMode === 'red_yellow') {
       filtered = allCards.filter((c) => getCardProgress(progressMap, c.id).status !== 'green');
@@ -333,7 +359,7 @@ export default function App() {
 
     const firstDeck = appData.decks.find((d) => deckIds.includes(d.id));
     window.history.pushState(
-      { view: 'study', folderId: currentFolderIdRef.current },
+      { minmin: 'study', folderId: currentFolderIdRef.current },
       '',
       firstDeck ? `#deck=${encodeURIComponent(firstDeck.id)}` : '#study'
     );

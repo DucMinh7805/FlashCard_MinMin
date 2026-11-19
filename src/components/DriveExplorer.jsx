@@ -318,7 +318,7 @@ export default function DriveExplorer({
               onStartStudy({
                 title: currentFolderObj ? `Thư mục: ${currentFolderObj.name}` : 'Toàn bộ Kho môn học',
                 deckIds: scopeDeckIds,
-                filterMode: scopeStats.due > 0 ? 'due_only' : 'all',
+                filterMode: scopeStats.due > 0 ? 'due' : 'all',
               })
             }
             className="w-full py-2.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition active:scale-98"
@@ -614,7 +614,7 @@ export default function DriveExplorer({
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <GripVertical className="w-3.5 h-3.5 text-slate-400 shrink-0 cursor-grab hover:text-sky-600 transition" title="Kéo bài học này thả vào thư mục khác" />
+                          <GripVertical className="w-3.5 h-3.5 text-slate-400 shrink-0 cursor-grab hover:text-sky-600 transition" title="Kéo bài học này thả vào thư mục khác (trên điện thoại: dùng menu ⋮ Di chuyển)" />
                           <BookOpen className="w-4 h-4 text-sky-600 shrink-0" />
                           <h3 className="font-bold text-slate-800 text-sm sm:text-base line-clamp-2 leading-snug break-words">
                             {deck.name}

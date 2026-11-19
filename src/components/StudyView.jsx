@@ -5,7 +5,6 @@ import {
   MoreHorizontal,
   Shuffle,
   Edit3,
-  RotateCw,
   Lightbulb,
   CheckCircle,
   X,
@@ -62,12 +61,22 @@ export default function StudyView({
   const [imgError, setImgError] = useState(false);
   const [lightboxImg, setLightboxImg] = useState(null);
 
-  // Swipe Gestures State
+  // Swipe & Tap Gestures State
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [exitDirection, setExitDirection] = useState(null); // 'left' | 'right' | 'up' | 'down' | null
   const dragStartRef = useRef({ x: 0, y: 0, time: 0 });
+  const dragCurrentRef = useRef({ x: 0, y: 0 });
   const isPointerDownRef = useRef(false);
+  const hasMovedRef = useRef(false);
+  const lastFlipTimeRef = useRef(0);
+
+  const triggerFlip = () => {
+    const now = Date.now();
+    if (now - lastFlipTimeRef.current < 250) return; // Chống double-tap / ghost click
+    lastFlipTimeRef.current = now;
+    onFlip();
+  };
 
   const allSessionCards = getCardsByDeckIds(session.deckIds);
   const st = computeStatsForCards(allSessionCards, progressMap);
@@ -81,6 +90,7 @@ export default function StudyView({
     setExitDirection(null);
     setIsDragging(false);
     isPointerDownRef.current = false;
+    hasMovedRef.current = false;
   }, [card?.id]);
 
   const triggerSwipe = (dir, rateColor) => {
@@ -103,53 +113,65 @@ export default function StudyView({
       setExitDirection(null);
       setIsDragging(false);
       isPointerDownRef.current = false;
+      hasMovedRef.current = false;
     }, 180);
   };
 
   const handlePointerDown = (e) => {
     if (exitDirection) return;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    dragStartRef.current = { x: clientX, y: clientY, time: Date.now() };
+    // Bỏ qua nếu người dùng ấn vào các nút con (Button xem Gợi ý, Phóng to ảnh...)
+    if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.no-drag')) {
+      return;
+    }
+    dragStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
+    dragCurrentRef.current = { x: e.clientX, y: e.clientY };
     isPointerDownRef.current = true;
+    hasMovedRef.current = false;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch (_) {}
   };
 
   const handlePointerMove = (e) => {
     if (!isPointerDownRef.current || exitDirection) return;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    const dx = clientX - dragStartRef.current.x;
-    const dy = clientY - dragStartRef.current.y;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    dragCurrentRef.current = { x: e.clientX, y: e.clientY };
 
-    // Ngăn chặn hoàn toàn việc trình duyệt cuộn trang web khi đang kéo cử chỉ
-    if (e.cancelable && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
-      e.preventDefault();
+    if (!hasMovedRef.current && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+      hasMovedRef.current = true;
+      setIsDragging(true);
     }
 
-    setDragOffset({ x: dx, y: dy });
-    if (!isDragging && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
-      setIsDragging(true);
+    if (hasMovedRef.current) {
+      setDragOffset({ x: dx, y: dy });
     }
   };
 
-  const handlePointerUp = () => {
+  const handlePointerUp = (e) => {
     if (!isPointerDownRef.current) return;
     isPointerDownRef.current = false;
-    const dx = dragOffset.x;
-    const dy = dragOffset.y;
-    const elapsed = Date.now() - dragStartRef.current.time;
-    const dist = Math.hypot(dx, dy);
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch (_) {}
 
-    // Click/Tap nhẹ (< 10px và < 300ms): lật thẻ
-    if (dist < 10 && elapsed < 300) {
-      setDragOffset({ x: 0, y: 0 });
-      setIsDragging(false);
-      onFlip();
+    const dx = dragCurrentRef.current.x - dragStartRef.current.x;
+    const dy = dragCurrentRef.current.y - dragStartRef.current.y;
+    const dist = Math.hypot(dx, dy);
+    const wasDragging = hasMovedRef.current;
+
+    setDragOffset({ x: 0, y: 0 });
+    setIsDragging(false);
+    hasMovedRef.current = false;
+
+    // Chạm (Tap nhẹ): không kéo hoặc khoảng cách dịch chuyển nhỏ (< 25px) -> Lật thẻ ngay!
+    if (!wasDragging || dist < 25) {
+      triggerFlip();
       return;
     }
 
+    // Vuốt thẻ (Swipe): khoảng cách vuốt rõ ràng (>= 50px)
     const SWIPE_THRESHOLD = 50;
-
     if (Math.abs(dx) > Math.abs(dy)) {
       if (dx > SWIPE_THRESHOLD) {
         triggerSwipe('right', 'green'); // Vuốt phải -> Đã thuộc
@@ -170,9 +192,18 @@ export default function StudyView({
       }
     }
 
-    // Không đủ khoảng cách vuốt -> Đàn hồi trở lại vị trí gốc
+    // Khoảng cách lỡ cỡ (25-50px) -> đàn hồi trở lại vị trí gốc
+  };
+
+  const handlePointerCancel = (e) => {
+    if (!isPointerDownRef.current) return;
+    isPointerDownRef.current = false;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch (_) {}
     setDragOffset({ x: 0, y: 0 });
     setIsDragging(false);
+    hasMovedRef.current = false;
   };
 
   useEffect(() => {
@@ -190,7 +221,7 @@ export default function StudyView({
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
       if (e.code === 'Space') {
         e.preventDefault();
-        onFlip();
+        triggerFlip();
       } else if (e.key === '1') {
         onRate('red');
       } else if (e.key === '2') {
@@ -307,30 +338,37 @@ export default function StudyView({
         </div>
       </div>
 
-      {/* Swipe Gesture Hint bar */}
+      {/* Swipe Gesture & Tap Hint bar */}
       {!isComplete && card && (
-        <div className="flex items-center justify-between px-2 text-[11px] text-slate-500 font-medium select-none shrink-0">
-          <span className="flex items-center gap-1 text-rose-600 font-semibold">
-            <span>←</span> Vuốt trái: Chưa nhớ
-          </span>
-          <span className="flex items-center gap-1 text-amber-700 font-semibold">
-            <span>↕</span> Lên/Xuống: Tạm hiểu
-          </span>
-          <span className="flex items-center gap-1 text-emerald-700 font-semibold">
-            Vuốt phải: Đã thuộc <span>→</span>
-          </span>
+        <div className="flex items-center justify-between px-2 text-[11px] text-slate-500 font-medium select-none shrink-0 min-h-[20px]">
+          {session.isFlipped ? (
+            <>
+              <span className="flex items-center gap-1 text-rose-600 font-semibold">
+                <span>←</span> Vuốt trái: Chưa nhớ
+              </span>
+              <span className="flex items-center gap-1 text-amber-700 font-semibold">
+                <span>↕</span> Lên/Xuống: Tạm hiểu
+              </span>
+              <span className="flex items-center gap-1 text-emerald-700 font-semibold">
+                Vuốt phải: Đã thuộc <span>→</span>
+              </span>
+            </>
+          ) : (
+            <div className="w-full text-center text-slate-400 font-medium flex items-center justify-center gap-1.5 animate-pulse">
+              <span>👆</span>
+              <span>Chạm thẻ để xem đáp án • Phím Cách (Space)</span>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Main Flashcard Card: Tràn đầy khoảng trống, căn giữa nội dung và hỗ trợ vuốt Swipe 4 hướng */}
+      {/* Main Flashcard Card: Tràn đầy khoảng trống, căn giữa nội dung, chạm để lật và hỗ trợ vuốt Swipe 4 hướng */}
       {!isComplete && card ? (
         <div
-          onTouchStart={handlePointerDown}
-          onTouchMove={handlePointerMove}
-          onTouchEnd={handlePointerUp}
-          onMouseDown={handlePointerDown}
-          onMouseMove={handlePointerMove}
-          onMouseUp={handlePointerUp}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
           style={{
             transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) rotate(${dragOffset.x * 0.08}deg)`,
             transition: isDragging
@@ -338,7 +376,7 @@ export default function StudyView({
               : 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease',
             opacity: exitDirection ? 0.3 : 1,
           }}
-          className="glass-panel rounded-3xl p-4 sm:p-7 flex-1 min-h-0 flex flex-col justify-between select-none shadow-lg relative overflow-hidden touch-none cursor-grab active:cursor-grabbing border border-white/90"
+          className="glass-panel rounded-3xl p-4 sm:p-7 flex-1 min-h-0 flex flex-col justify-between select-none shadow-lg relative overflow-hidden touch-none cursor-pointer border border-white/90 active:scale-[0.995] transition-transform"
         >
           {/* Stamps phản hồi thị giác khi vuốt */}
           {((dragOffset.x > 25 && !exitDirection) || exitDirection === 'right') && (
@@ -568,52 +606,41 @@ export default function StudyView({
         </div>
       )}
 
-      {/* BOTTOM ACTION BAR: Tích hợp trực tiếp vào flex flow ở đáy, không dùng fixed để chống tràn màn hình */}
-      {!isComplete && card && (
-        <div className="shrink-0 w-full max-w-2xl mx-auto pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
-          {session.isFlipped ? (
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => onRate('red')}
-                className="rounded-2xl p-2 sm:p-2.5 text-center bg-rose-50/95 border border-rose-200/90 text-rose-700 hover:bg-rose-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5"
-              >
-                <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-rose-500" /> Chưa nhớ
-                </span>
-                <span className="text-[10px] text-rose-500">Vuốt trái</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onRate('yellow')}
-                className="rounded-2xl p-2 sm:p-2.5 text-center bg-amber-50/95 border border-amber-200/90 text-amber-800 hover:bg-amber-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5"
-              >
-                <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-amber-500" /> Tạm hiểu
-                </span>
-                <span className="text-[10px] text-amber-600">Vuốt lên / xuống</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => onRate('green')}
-                className="rounded-2xl p-2 sm:p-2.5 text-center bg-emerald-50/95 border border-emerald-200/90 text-emerald-800 hover:bg-emerald-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5"
-              >
-                <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> Đã thuộc
-                </span>
-                <span className="text-[10px] text-emerald-600">Vuốt phải</span>
-              </button>
-            </div>
-          ) : (
+      {/* BOTTOM ACTION BAR: Chỉ hiện sau khi đã lật thẻ để đánh giá 3 màu (Chưa nhớ / Tạm hiểu / Đã thuộc). Khi chưa lật thì ẩn hoàn toàn theo yêu cầu */}
+      {!isComplete && card && session.isFlipped && (
+        <div className="shrink-0 w-full max-w-2xl mx-auto pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] animate-fadeIn">
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
-              onClick={onFlip}
-              className="w-full py-2.5 sm:py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 active:scale-[0.98] text-white font-bold text-xs sm:text-sm shadow-md transition flex items-center justify-center gap-2"
+              onClick={() => onRate('red')}
+              className="rounded-2xl p-2 sm:p-2.5 text-center bg-rose-50/95 border border-rose-200/90 text-rose-700 hover:bg-rose-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5 cursor-pointer"
             >
-              <RotateCw className="w-4 h-4" />
-              <span>Chạm thẻ hoặc bấm vào đây để lật đáp án</span>
+              <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-rose-500" /> Chưa nhớ
+              </span>
+              <span className="text-[10px] text-rose-500">Vuốt trái</span>
             </button>
-          )}
+            <button
+              type="button"
+              onClick={() => onRate('yellow')}
+              className="rounded-2xl p-2 sm:p-2.5 text-center bg-amber-50/95 border border-amber-200/90 text-amber-800 hover:bg-amber-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5 cursor-pointer"
+            >
+              <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-amber-500" /> Tạm hiểu
+              </span>
+              <span className="text-[10px] text-amber-600">Vuốt lên / xuống</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onRate('green')}
+              className="rounded-2xl p-2 sm:p-2.5 text-center bg-emerald-50/95 border border-emerald-200/90 text-emerald-800 hover:bg-emerald-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5 cursor-pointer"
+            >
+              <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" /> Đã thuộc
+              </span>
+              <span className="text-[10px] text-emerald-600">Vuốt phải</span>
+            </button>
+          </div>
         </div>
       )}
 

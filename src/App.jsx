@@ -33,6 +33,25 @@ export default function App() {
     return () => window.removeEventListener('minmin_quota_error', handleQuotaErr);
   }, [showToast]);
 
+  // Network online/offline status
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      showToast('Đã kết nối lại mạng! Tự động đồng bộ Cloud.');
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      showToast('Mất kết nối mạng! Bạn vẫn học và lưu tiến độ trên máy bình thường.');
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [showToast]);
+
   const [activeSession, setActiveSession] = useState(null);
   const [resumeCandidate, setResumeCandidate] = useState(() => {
     const saved = safeGet(STORAGE_KEY_SESSION, null);
@@ -490,6 +509,7 @@ export default function App() {
       {/* Top Navigation - Single Row Mini Drive Header (Hidden during active Study session) */}
       {!activeSession && (
         <Header
+          isOnline={isOnline}
           isCloudSyncing={isCloudSyncing}
           hasCloudConnection={!!settings.supabaseUrl}
           onResetNavigation={() => {

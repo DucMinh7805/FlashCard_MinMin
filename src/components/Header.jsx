@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 
 export default function Header({
+  isOnline = true,
   isCloudSyncing,
   hasCloudConnection,
   onResetNavigation,
@@ -42,13 +43,21 @@ export default function Header({
             <span className="font-bold tracking-tight text-slate-800 text-sm sm:text-base">FlashCard MinMin</span>
             <span
               className={`w-2 h-2 rounded-full inline-block shrink-0 ${
-                isCloudSyncing
-                  ? 'bg-amber-400 animate-pulse'
-                  : hasCloudConnection
-                    ? 'bg-emerald-500 ring-2 ring-emerald-200'
-                    : 'bg-slate-300'
+                !isOnline
+                  ? 'bg-slate-400 ring-2 ring-slate-200'
+                  : isCloudSyncing
+                    ? 'bg-amber-400 animate-pulse'
+                    : hasCloudConnection
+                      ? 'bg-emerald-500 ring-2 ring-emerald-200'
+                      : 'bg-slate-300'
               }`}
-              title={isCloudSyncing ? 'Đang đồng bộ Cloud...' : 'Đám mây Mini Drive kết nối'}
+              title={
+                !isOnline
+                  ? 'Ngoại tuyến (Offline) - Vẫn học và lưu máy bình thường'
+                  : isCloudSyncing
+                    ? 'Đang đồng bộ Cloud...'
+                    : 'Đám mây Mini Drive kết nối'
+              }
             />
           </div>
         </button>

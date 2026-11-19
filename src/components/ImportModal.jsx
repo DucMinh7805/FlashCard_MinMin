@@ -29,18 +29,18 @@ export default function ImportModal({
     onClose();
   };
 
-  if (!isOpen) return null;
-
   const parsed = parseImportInput(rawText);
   const clozeCount = parsed.cards.filter((c) => c.type === 'cloze').length;
   const caseCount = parsed.cards.filter((c) => c.type === 'case').length;
 
   // Auto-sync parsed note if user hasn't typed their own note
   useEffect(() => {
-    if (parsed.note && !deckNote.trim()) {
+    if (isOpen && parsed.note && !deckNote.trim()) {
       setDeckNote(parsed.note);
     }
-  }, [parsed.note, deckNote]);
+  }, [isOpen, parsed.note, deckNote]);
+
+  if (!isOpen) return null;
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];

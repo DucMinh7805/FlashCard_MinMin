@@ -49,6 +49,20 @@ export default function App() {
   const [selectedFolderForAction, setSelectedFolderForAction] = useState(null);
   const [selectedDeckForAction, setSelectedDeckForAction] = useState(null);
 
+  // Refs for navigation & mobile back gesture
+  const currentFolderIdRef = useRef(currentFolderId);
+  currentFolderIdRef.current = currentFolderId;
+
+  const activeSessionRef = useRef(activeSession);
+  activeSessionRef.current = activeSession;
+
+  const isModalOpen = !!(importOpen || promptOpen || analyticsOpen || thesisDocsOpen || settingsOpen || editorMode);
+  const isModalOpenRef = useRef(isModalOpen);
+  isModalOpenRef.current = isModalOpen;
+
+  const isPoppingModalRef = useRef(false);
+  const isPoppingStudyRef = useRef(false);
+
   // Mini Drive Core Hook
   const miniDrive = useMiniDrive({
     showToast,
@@ -81,6 +95,134 @@ export default function App() {
     handleSaveCard,
   } = miniDrive;
 
+  const appDataRef = useRef(appData);
+  appDataRef.current = appData;
+
+  // Folder navigation with History PushState
+  const handleSelectFolder = useCallback((folderId) => {
+    if (folderId === currentFolderIdRef.current) return;
+    const hash = folderId ? `#folder=${encodeURIComponent(folderId)}` : '';
+    window.history.pushState(
+      { view: 'folder', folderId },
+      '',
+      window.location.pathname + hash
+    );
+    setCurrentFolderId(folderId);
+  }, []);
+
+  // Modal History Helpers
+  const pushModalHistory = () => {
+    window.history.pushState({ view: 'modal' }, '');
+  };
+
+  const openImport = () => {
+    pushModalHistory();
+    setImportOpen(true);
+  };
+  const openPrompt = () => {
+    pushModalHistory();
+    setPromptOpen(true);
+  };
+  const openAnalytics = () => {
+    pushModalHistory();
+    setAnalyticsOpen(true);
+  };
+  const openThesisDocs = () => {
+    pushModalHistory();
+    setThesisDocsOpen(true);
+  };
+  const openSettings = () => {
+    pushModalHistory();
+    setSettingsOpen(true);
+  };
+  const openEditor = (mode, folder = null, deck = null, card = null) => {
+    pushModalHistory();
+    setSelectedFolderForAction(folder);
+    setSelectedDeckForAction(deck);
+    setEditingCard(card);
+    setEditorMode(mode);
+  };
+
+  const closeAllModals = useCallback(() => {
+    setImportOpen(false);
+    setPromptOpen(false);
+    setAnalyticsOpen(false);
+    setThesisDocsOpen(false);
+    setSettingsOpen(false);
+    setEditorMode(null);
+    setSelectedFolderForAction(null);
+    setSelectedDeckForAction(null);
+    setEditingCard(null);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    closeAllModals();
+    if (window.history.state?.view === 'modal') {
+      isPoppingModalRef.current = true;
+      window.history.back();
+    }
+  }, [closeAllModals]);
+
+  // Study Session Exit with History sync
+  const handleExitStudy = useCallback(() => {
+    setActiveSession(null);
+    if (window.history.state?.view === 'study') {
+      isPoppingStudyRef.current = true;
+      window.history.back();
+    } else {
+      const folderId = currentFolderIdRef.current;
+      const nextHash = folderId ? `#folder=${encodeURIComponent(folderId)}` : '';
+      window.history.replaceState(null, '', window.location.pathname + nextHash);
+    }
+  }, []);
+
+  // Mobile Hardware Back / PopState listener
+  useEffect(() => {
+    const handlePopState = (e) => {
+      if (isPoppingModalRef.current) {
+        isPoppingModalRef.current = false;
+        return;
+      }
+      if (isPoppingStudyRef.current) {
+        isPoppingStudyRef.current = false;
+        return;
+      }
+
+      // 1. If any modal is open -> close modal
+      if (isModalOpenRef.current) {
+        closeAllModals();
+        return;
+      }
+
+      // 2. If study session is active -> exit study view back to folder
+      if (activeSessionRef.current) {
+        setActiveSession(null);
+        const folderId = currentFolderIdRef.current;
+        const nextHash = folderId ? `#folder=${encodeURIComponent(folderId)}` : '';
+        window.history.replaceState(null, '', window.location.pathname + nextHash);
+        return;
+      }
+
+      // 3. If in a subfolder -> go back to parent folder
+      if (currentFolderIdRef.current !== null) {
+        const targetFolder =
+          e.state && typeof e.state.folderId !== 'undefined'
+            ? e.state.folderId
+            : (appDataRef.current?.folders?.find((f) => f.id === currentFolderIdRef.current)?.parentId || null);
+
+        setCurrentFolderId(targetFolder);
+        const nextHash = targetFolder ? `#folder=${encodeURIComponent(targetFolder)}` : '';
+        window.history.replaceState(null, '', window.location.pathname + nextHash);
+        return;
+      }
+
+      // 4. If at root -> allow default browser back/exit
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [closeAllModals]);
+
   // Study Session Handlers
   const openDeckDirectly = useCallback(
     (deck) => {
@@ -111,15 +253,17 @@ export default function App() {
       setUndoStack([]);
       safeSet(STORAGE_KEY_SESSION, nextSession);
       setResumeCandidate(nextSession);
+      window.history.replaceState(
+        { view: 'study', folderId: deck.folderId || null },
+        '',
+        `#deck=${encodeURIComponent(deck.id)}`
+      );
       return true;
     },
     [showToast]
   );
 
-  // URL Hash resolution
-  const appDataRef = useRef(appData);
-  appDataRef.current = appData;
-
+  // URL Hash resolution on load
   const resolveHash = useCallback(
     (sourceData) => {
       const hash = window.location.hash || '';
@@ -137,6 +281,7 @@ export default function App() {
         const fid = decodeURIComponent(hash.slice('#folder='.length));
         if (data.folders?.some((f) => f.id === fid)) {
           setCurrentFolderId(fid);
+          window.history.replaceState({ view: 'folder', folderId: fid }, '', window.location.hash);
           return true;
         }
       }
@@ -163,6 +308,11 @@ export default function App() {
     resumeState = null,
   }) => {
     if (resumeState) {
+      window.history.pushState(
+        { view: 'study', folderId: currentFolderIdRef.current },
+        '',
+        resumeState.deckIds?.[0] ? `#deck=${encodeURIComponent(resumeState.deckIds[0])}` : '#study'
+      );
       setActiveSession(resumeState);
       setUndoStack([]);
       return;
@@ -185,6 +335,12 @@ export default function App() {
     }
 
     const firstDeck = appData.decks.find((d) => deckIds.includes(d.id));
+    window.history.pushState(
+      { view: 'study', folderId: currentFolderIdRef.current },
+      '',
+      firstDeck ? `#deck=${encodeURIComponent(firstDeck.id)}` : '#study'
+    );
+
     const nextSession = {
       title,
       deckIds,
@@ -315,22 +471,19 @@ export default function App() {
           hasCloudConnection={!!settings.supabaseUrl}
           onResetNavigation={() => {
             setActiveSession(null);
-            setCurrentFolderId(null);
+            handleSelectFolder(null);
           }}
-          onOpenAnalytics={() => setAnalyticsOpen(true)}
+          onOpenAnalytics={openAnalytics}
           showSearch={showSearch}
           setShowSearch={setShowSearch}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           plusMenuOpen={plusMenuOpen}
           setPlusMenuOpen={setPlusMenuOpen}
-          onOpenImport={() => setImportOpen(true)}
-          onOpenNewFolder={() => {
-            setSelectedFolderForAction(null);
-            setEditorMode('new_folder');
-          }}
-          onOpenPrompt={() => setPromptOpen(true)}
-          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenImport={openImport}
+          onOpenNewFolder={() => openEditor('new_folder')}
+          onOpenPrompt={openPrompt}
+          onOpenSettings={openSettings}
         />
       )}
 
@@ -355,37 +508,19 @@ export default function App() {
             progressMap={progressMap}
             activityLogs={activityLogs}
             currentFolderId={currentFolderId}
-            setCurrentFolderId={setCurrentFolderId}
+            setCurrentFolderId={handleSelectFolder}
             searchQuery={searchQuery}
             onStartStudy={startStudySession}
-            onNewFolder={() => {
-              setSelectedFolderForAction(null);
-              setEditorMode('new_folder');
-            }}
-            onNewDeck={() => setImportOpen(true)}
-            onEditFolder={(f) => {
-              setSelectedFolderForAction(f);
-              setEditorMode('edit_folder');
-            }}
-            onMoveFolder={(f) => {
-              setSelectedFolderForAction(f);
-              setEditorMode('move_folder');
-            }}
-            onEditDeck={(d) => {
-              setSelectedDeckForAction(d);
-              setEditorMode('edit_deck');
-            }}
-            onMoveDeck={(d) => {
-              setSelectedDeckForAction(d);
-              setEditorMode('move_deck');
-            }}
+            onNewFolder={() => openEditor('new_folder')}
+            onNewDeck={openImport}
+            onEditFolder={(f) => openEditor('edit_folder', f)}
+            onMoveFolder={(f) => openEditor('move_folder', f)}
+            onEditDeck={(d) => openEditor('edit_deck', null, d)}
+            onMoveDeck={(d) => openEditor('move_deck', null, d)}
             onQuickMoveFolder={handleMoveFolder}
             onQuickMoveDeck={handleMoveDeck}
-            onViewNote={(d) => {
-              setSelectedDeckForAction(d);
-              setEditorMode('view_note');
-            }}
-            onDeleteFolder={(fId) => handleDeleteFolder(fId, currentFolderId, setCurrentFolderId)}
+            onViewNote={(d) => openEditor('view_note', null, d)}
+            onDeleteFolder={(fId) => handleDeleteFolder(fId, currentFolderId, handleSelectFolder)}
             onDeleteDeck={handleDeleteDeck}
             onShareLink={handleShareLink}
             getFolderPath={getFolderPath}
@@ -398,13 +533,7 @@ export default function App() {
             progressMap={progressMap}
             undoCount={undoStack.length}
             getCardsByDeckIds={getCardsByDeckIds}
-            onExit={() => {
-              setActiveSession(null);
-              if (window.location.hash.startsWith('#deck=')) {
-                const nextHash = currentFolderId ? `#folder=${currentFolderId}` : '';
-                window.history.replaceState(null, '', window.location.pathname + nextHash);
-              }
-            }}
+            onExit={handleExitStudy}
             onFlip={() => setActiveSession((s) => (s ? { ...s, isFlipped: !s.isFlipped } : s))}
             onToggleHint={() => setActiveSession((s) => (s ? { ...s, hintVisible: !s.hintVisible } : s))}
             onRate={handleRate}
@@ -432,8 +561,7 @@ export default function App() {
             }
             onEditCard={(targetCard) => {
               const cardToEdit = targetCard || (activeSession ? activeSession.queue[activeSession.currentIndex] : null);
-              setEditingCard(cardToEdit);
-              setEditorMode('edit_card');
+              openEditor('edit_card', null, null, cardToEdit);
             }}
             onRestartSession={(filterMode) =>
               startStudySession({
@@ -446,8 +574,7 @@ export default function App() {
             onViewDeckNote={() => {
               const deck = appData.decks.find((d) => activeSession.deckIds.includes(d.id));
               if (deck) {
-                setSelectedDeckForAction(deck);
-                setEditorMode('view_note');
+                openEditor('view_note', null, deck);
               }
             }}
           />
@@ -458,13 +585,13 @@ export default function App() {
       {!activeSession && (
         <BottomDock
           currentFolderId={currentFolderId}
-          setCurrentFolderId={setCurrentFolderId}
+          setCurrentFolderId={handleSelectFolder}
           showSearch={showSearch}
           setShowSearch={setShowSearch}
           analyticsOpen={analyticsOpen}
-          setAnalyticsOpen={setAnalyticsOpen}
+          setAnalyticsOpen={(open) => (open ? openAnalytics() : handleCloseModal())}
           settingsOpen={settingsOpen}
-          setSettingsOpen={setSettingsOpen}
+          setSettingsOpen={(open) => (open ? openSettings() : handleCloseModal())}
           appData={appData}
           progressMap={progressMap}
           onStartStudy={startStudySession}
@@ -475,7 +602,7 @@ export default function App() {
       {/* Modals & Dialogs Component */}
       <AppModals
         importOpen={importOpen}
-        setImportOpen={setImportOpen}
+        setImportOpen={(open) => (open ? openImport() : handleCloseModal())}
         onConfirmImport={({ parsed, selectedFolderId, deckNameInput, deckNoteInput }) => {
           handleConfirmImport({
             parsed,
@@ -484,25 +611,25 @@ export default function App() {
             deckNoteInput,
             currentFolderId,
             onComplete: (tFid) => {
-              setCurrentFolderId(tFid);
-              setImportOpen(false);
+              handleCloseModal();
+              handleSelectFolder(tFid);
             },
           });
         }}
         promptOpen={promptOpen}
-        setPromptOpen={setPromptOpen}
+        setPromptOpen={(open) => (open ? openPrompt() : handleCloseModal())}
         analyticsOpen={analyticsOpen}
-        setAnalyticsOpen={setAnalyticsOpen}
+        setAnalyticsOpen={(open) => (open ? openAnalytics() : handleCloseModal())}
         thesisDocsOpen={thesisDocsOpen}
-        setThesisDocsOpen={setThesisDocsOpen}
+        setThesisDocsOpen={(open) => (open ? openThesisDocs() : handleCloseModal())}
         settingsOpen={settingsOpen}
-        setSettingsOpen={setSettingsOpen}
+        setSettingsOpen={(open) => (open ? openSettings() : handleCloseModal())}
         settings={settings}
         onUpdateSettings={updateSettings}
         onPullCloud={() => syncFromCloud(false)}
         onResetProgress={resetProgress}
         editorMode={editorMode}
-        setEditorMode={setEditorMode}
+        setEditorMode={(mode) => (mode ? openEditor(mode) : handleCloseModal())}
         editingCard={editingCard}
         setEditingCard={setEditingCard}
         selectedFolderForAction={selectedFolderForAction}
@@ -511,35 +638,30 @@ export default function App() {
         setSelectedDeckForAction={setSelectedDeckForAction}
         onSaveFolder={({ name, icon }) => {
           handleCreateFolder({ name, icon, parentId: currentFolderId });
-          setEditorMode(null);
+          handleCloseModal();
         }}
         onEditFolder={(folderId, data) => {
           handleEditFolder(folderId, data);
-          setEditorMode(null);
-          setSelectedFolderForAction(null);
+          handleCloseModal();
         }}
         onMoveFolder={(folderId, targetParentId) => {
           handleMoveFolder(folderId, targetParentId);
-          setEditorMode(null);
-          setSelectedFolderForAction(null);
+          handleCloseModal();
         }}
         onEditDeck={({ id, name, note }, openEditMode) => {
           if (openEditMode) {
             const deck = appData.decks.find((d) => d.id === id);
             if (deck) {
-              setSelectedDeckForAction(deck);
-              setEditorMode('edit_deck');
+              openEditor('edit_deck', null, deck);
             }
             return;
           }
           handleEditDeck({ id, name, note });
-          setEditorMode(null);
-          setSelectedDeckForAction(null);
+          handleCloseModal();
         }}
         onMoveDeck={(deckId, newFolderId) => {
           handleMoveDeck(deckId, newFolderId);
-          setEditorMode(null);
-          setSelectedDeckForAction(null);
+          handleCloseModal();
         }}
         onSaveCard={(updated) => {
           const target = editingCard || activeSession?.queue[activeSession.currentIndex];
@@ -552,8 +674,7 @@ export default function App() {
             setActiveSession(nextSession);
             safeSet(STORAGE_KEY_SESSION, nextSession);
           }
-          setEditorMode(null);
-          setEditingCard(null);
+          handleCloseModal();
         }}
         appData={appData}
         setAppData={setAppData}

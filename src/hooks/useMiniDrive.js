@@ -55,7 +55,7 @@ export function getAllDescendantFolderIds(rootFolderId, allFolders) {
 export function useMiniDrive({ showToast, hasActiveSession }) {
   const [appData, setAppData] = useState(() => {
     const saved = safeGet(STORAGE_KEY_CONTENT, null);
-    if (saved?.folders && saved?.decks) {
+    if (saved?.folders && saved?.decks && (saved.folders.length > 0 || saved.decks.length > 0)) {
       const normalized = normalizeCurriculumData(saved);
       safeSet(STORAGE_KEY_CONTENT, normalized);
       return normalized;
@@ -89,7 +89,7 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
       setIsCloudSyncing(true);
       try {
         const rawCloud = await pullCloudData(settings.supabaseUrl, settings.supabaseKey);
-        if (rawCloud) {
+        if (rawCloud && (rawCloud.folders?.length > 0 || rawCloud.decks?.length > 0)) {
           const cloud = normalizeCurriculumData(rawCloud);
           setAppData(cloud);
           safeSet(STORAGE_KEY_CONTENT, cloud);

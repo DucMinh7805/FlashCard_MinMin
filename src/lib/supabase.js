@@ -3,7 +3,7 @@ export const DEFAULT_SUPABASE_KEY = 'sb_publishable_ZxaxQF8bn8DZrn1gK3WDLQ_KQRpe
 
 export function buildSupabaseHeaders(key, extra = {}) {
   const headers = { apikey: key, ...extra };
-  if (key && !headers.Authorization) {
+  if (key && key.startsWith('eyJ') && !headers.Authorization) {
     headers.Authorization = `Bearer ${key}`;
   }
   return headers;
@@ -305,8 +305,14 @@ export async function pullCloudData(url, key) {
     });
     if (!res.ok) return null;
     const data = await res.json();
-    if (Array.isArray(data) && data[0]?.payload && Array.isArray(data[0].payload.folders)) {
-      return normalizeCurriculumData(data[0].payload);
+    const payload = data?.[0]?.payload;
+    if (
+      payload &&
+      Array.isArray(payload.folders) &&
+      Array.isArray(payload.decks) &&
+      (payload.folders.length > 0 || payload.decks.length > 0)
+    ) {
+      return normalizeCurriculumData(payload);
     }
     return null;
   } catch {

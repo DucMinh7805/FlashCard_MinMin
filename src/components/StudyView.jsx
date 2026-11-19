@@ -99,6 +99,10 @@ export default function StudyView({
   const prog = card ? getCardProgress(progressMap, card.id) : null;
 
   useEffect(() => {
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
     setImgError(false);
     setDragOffset({ x: 0, y: 0 });
     setExitDirection(null);
@@ -109,6 +113,10 @@ export default function StudyView({
 
   const triggerSwipe = (dir, rateColor) => {
     if (exitDirection) return;
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
     wasSwipeRef.current = true;
     setExitDirection(dir);
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -124,6 +132,10 @@ export default function StudyView({
 
     setTimeout(() => {
       onRate(rateColor);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
       setDragOffset({ x: 0, y: 0 });
       setExitDirection(null);
       setIsDragging(false);
@@ -174,9 +186,12 @@ export default function StudyView({
       return;
     }
 
-    if (!hasMovedRef.current && (Math.abs(dx) > 6 || (!scrollable && Math.abs(dy) > 6))) {
+    if (!hasMovedRef.current && (Math.abs(dx) > 8 || (!scrollable && Math.abs(dy) > 8))) {
       hasMovedRef.current = true;
       setIsDragging(true);
+      if (typeof window !== 'undefined' && window.getSelection) {
+        window.getSelection().removeAllRanges();
+      }
     }
 
     if (hasMovedRef.current) {
@@ -184,6 +199,7 @@ export default function StudyView({
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() => {
         setDragOffset({ x: dx, y: scrollable ? 0 : dy });
+        rafRef.current = null;
       });
     }
   };
@@ -191,7 +207,12 @@ export default function StudyView({
   const handlePointerUp = () => {
     if (!isPointerDownRef.current) return;
     isPointerDownRef.current = false;
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+
+    // Hủy dứt điểm bất kỳ frame rAF nào đang chờ thực thi để không làm thẻ mới bị giật lệch
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
 
     const dx = dragCurrentRef.current.x - dragStartRef.current.x;
     const dy = dragCurrentRef.current.y - dragStartRef.current.y;
@@ -203,8 +224,17 @@ export default function StudyView({
     setIsDragging(false);
     hasMovedRef.current = false;
 
-    // Chạm (Tap nhẹ): không kéo hoặc khoảng cách dịch chuyển nhỏ (< 30px) -> Lật thẻ ngay!
-    if (!wasDragging || dist < 30) {
+    // Nếu người dùng vừa bôi đen chọn văn bản trên máy tính (select text) thì không kích hoạt lật thẻ
+    const hasSelection =
+      typeof window !== 'undefined' &&
+      window.getSelection &&
+      window.getSelection().toString().trim().length > 0;
+    if (hasSelection) {
+      return;
+    }
+
+    // Chạm (Tap nhẹ): không kéo hoặc khoảng cách dịch chuyển nhỏ (< 25px) -> Lật thẻ ngay!
+    if (!wasDragging || dist < 25) {
       triggerFlip();
       return;
     }
@@ -238,7 +268,12 @@ export default function StudyView({
   const handlePointerCancel = () => {
     if (!isPointerDownRef.current) return;
     isPointerDownRef.current = false;
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+
+    // Hủy frame rAF ngay lập tức
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
     setDragOffset({ x: 0, y: 0 });
     setIsDragging(false);
     hasMovedRef.current = false;
@@ -479,7 +514,9 @@ export default function StudyView({
           {/* Card Scrollable Content Area: touch-pan-y giữ nguyên cuộn dọc 100% khi thẻ Y khoa dài */}
           <div
             ref={cardScrollRef}
-            className="my-auto py-2 space-y-3 max-h-full overflow-y-auto px-1 pr-1.5 flex flex-col justify-center touch-pan-y overscroll-contain select-text"
+            className={`my-auto py-2 space-y-3 max-h-full overflow-y-auto px-1 pr-1.5 flex flex-col justify-center touch-pan-y overscroll-contain ${
+              isDragging ? 'select-none pointer-events-none' : 'select-text'
+            }`}
           >
             <div className={`space-y-2 ${isCaseOrLong ? 'text-left' : 'text-center'}`}>
               <p className="text-[11px] uppercase tracking-widest text-sky-600 font-bold">

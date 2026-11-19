@@ -46,6 +46,7 @@ export default function DriveExplorer({
   appData,
   progressMap,
   activityLogs = {},
+  deviceId,
   currentFolderId,
   setCurrentFolderId,
   searchQuery,
@@ -249,6 +250,14 @@ export default function DriveExplorer({
                 <span className="font-extrabold text-slate-800 text-xs sm:text-sm">
                   {streak ? `${streak} ngày liên tục` : 'Bắt đầu học'}
                 </span>
+                {deviceId && (
+                  <span
+                    className="text-[10px] text-slate-500 font-bold bg-slate-100/90 px-1.5 py-0.5 rounded-md border border-slate-200/80 shrink-0"
+                    title={`Chuỗi học tập tính riêng cho máy này (ID: ${deviceId})`}
+                  >
+                    Máy #{deviceId.replace('dev_', '').slice(0, 4).toUpperCase()}
+                  </span>
+                )}
                 <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60 shrink-0">
                   {greenPct}% đã thuộc
                 </span>

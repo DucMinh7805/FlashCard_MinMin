@@ -18,7 +18,29 @@ export const STORAGE_KEY_CONTENT = 'minmin_flashcard_drive_v1';
 export const STORAGE_KEY_PROGRESS = 'minmin_flashcard_progress_v1';
 export const STORAGE_KEY_SESSION = 'minmin_flashcard_active_session_v1';
 export const STORAGE_KEY_SETTINGS = 'minmin_flashcard_settings_v1';
-export const STORAGE_KEY_ACTIVITY = 'minmin_flashcard_activity_v1';
+
+export function getDeviceId() {
+  if (typeof window === 'undefined') return 'device_default';
+  const KEY = 'minmin_device_id_v1';
+  let id = localStorage.getItem(KEY);
+  if (!id) {
+    const rand =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID().slice(0, 8)
+        : Math.random().toString(36).slice(2, 10);
+    id = `dev_${rand}`;
+    try {
+      localStorage.setItem(KEY, id);
+    } catch (_) {}
+  }
+  return id;
+}
+
+export function getActivityStorageKey() {
+  return `minmin_flashcard_activity_${getDeviceId()}`;
+}
+
+export const STORAGE_KEY_ACTIVITY = typeof window !== 'undefined' ? getActivityStorageKey() : 'minmin_flashcard_activity_default';
 
 export function safeGet(key, fallback) {
   try {
@@ -74,7 +96,16 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
   });
 
   const [progressMap, setProgressMap] = useState(() => safeGet(STORAGE_KEY_PROGRESS, {}));
-  const [activityLogs, setActivityLogs] = useState(() => safeGet(STORAGE_KEY_ACTIVITY, {}));
+  const [activityLogs, setActivityLogs] = useState(() => {
+    const saved = safeGet(STORAGE_KEY_ACTIVITY, null);
+    if (saved) return saved;
+    const legacy = safeGet('minmin_flashcard_activity_v1', {});
+    if (legacy && Object.keys(legacy).length > 0) {
+      safeSet(STORAGE_KEY_ACTIVITY, legacy);
+      return legacy;
+    }
+    return {};
+  });
   const [settings, setSettings] = useState(() => {
     const saved = safeGet(STORAGE_KEY_SETTINGS, {});
     return {
@@ -455,6 +486,7 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
     setProgressMap,
     activityLogs,
     setActivityLogs,
+    deviceId: getDeviceId(),
     settings,
     setSettings,
     updateSettings,

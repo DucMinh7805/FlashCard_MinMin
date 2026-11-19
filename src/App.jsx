@@ -112,6 +112,7 @@ export default function App() {
     setProgressMap,
     activityLogs,
     setActivityLogs,
+    deviceId,
     settings,
     updateSettings,
     resetProgress,
@@ -556,6 +557,7 @@ export default function App() {
             appData={appData}
             progressMap={progressMap}
             activityLogs={activityLogs}
+            deviceId={deviceId}
             currentFolderId={currentFolderId}
             setCurrentFolderId={handleSelectFolder}
             searchQuery={searchQuery}

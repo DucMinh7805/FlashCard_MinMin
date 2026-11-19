@@ -88,13 +88,13 @@ export default function StudyView({
     setExitDirection(dir);
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       try {
-        navigator.vibrate(20);
+        navigator.vibrate(18);
       } catch (_) {}
     }
     const targetX =
-      dir === 'right' ? window.innerWidth * 1.3 : dir === 'left' ? -window.innerWidth * 1.3 : 0;
+      dir === 'right' ? window.innerWidth * 1.2 : dir === 'left' ? -window.innerWidth * 1.2 : 0;
     const targetY =
-      dir === 'up' ? -window.innerHeight * 1.3 : dir === 'down' ? window.innerHeight * 1.3 : 0;
+      dir === 'up' ? -window.innerHeight * 1.2 : dir === 'down' ? window.innerHeight * 1.2 : 0;
     setDragOffset({ x: targetX, y: targetY });
 
     setTimeout(() => {
@@ -103,7 +103,7 @@ export default function StudyView({
       setExitDirection(null);
       setIsDragging(false);
       isPointerDownRef.current = false;
-    }, 200);
+    }, 180);
   };
 
   const handlePointerDown = (e) => {
@@ -120,8 +120,14 @@ export default function StudyView({
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     const dx = clientX - dragStartRef.current.x;
     const dy = clientY - dragStartRef.current.y;
+
+    // Ngăn chặn hoàn toàn việc trình duyệt cuộn trang web khi đang kéo cử chỉ
+    if (e.cancelable && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+      e.preventDefault();
+    }
+
     setDragOffset({ x: dx, y: dy });
-    if (!isDragging && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+    if (!isDragging && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
       setIsDragging(true);
     }
   };
@@ -134,15 +140,15 @@ export default function StudyView({
     const elapsed = Date.now() - dragStartRef.current.time;
     const dist = Math.hypot(dx, dy);
 
-    // Click/Tap nhẹ (< 12px và < 350ms): lật thẻ
-    if (dist < 12 && elapsed < 350) {
+    // Click/Tap nhẹ (< 10px và < 300ms): lật thẻ
+    if (dist < 10 && elapsed < 300) {
       setDragOffset({ x: 0, y: 0 });
       setIsDragging(false);
       onFlip();
       return;
     }
 
-    const SWIPE_THRESHOLD = 70;
+    const SWIPE_THRESHOLD = 50;
 
     if (Math.abs(dx) > Math.abs(dy)) {
       if (dx > SWIPE_THRESHOLD) {
@@ -231,7 +237,7 @@ export default function StudyView({
   const isCaseOrLong = card?.type === 'case' || (card?.front && card.front.length > 80);
 
   return (
-    <section className="h-full flex-1 flex flex-col justify-between gap-2.5 pb-20 sm:pb-24">
+    <section className="fixed inset-0 z-50 flex flex-col justify-between p-2.5 sm:p-4 bg-gradient-to-br from-slate-100/95 via-sky-50/50 to-indigo-50/50 backdrop-blur-2xl overflow-hidden overscroll-none touch-none select-none h-[100dvh] w-screen">
       {/* Top Study Bar: 1 unified bar with counter, title, actions, and integrated 3px progress line */}
       <div className="relative glass-panel rounded-2xl px-3 sm:px-4 py-2 shadow-sm border border-white/90 overflow-hidden shrink-0">
         <div className="flex items-center justify-between gap-2">
@@ -562,54 +568,52 @@ export default function StudyView({
         </div>
       )}
 
-      {/* FIXED BOTTOM ACTION BAR: Sticky/Fixed at bottom for effortless one-handed thumb tap without scrolling */}
+      {/* BOTTOM ACTION BAR: Tích hợp trực tiếp vào flex flow ở đáy, không dùng fixed để chống tràn màn hình */}
       {!isComplete && card && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-xl border-t border-slate-200/90 px-3 sm:px-4 py-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
-          <div className="max-w-2xl mx-auto">
-            {session.isFlipped ? (
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => onRate('red')}
-                  className="rounded-2xl p-2.5 sm:p-3 text-center bg-rose-50/90 border border-rose-200/90 text-rose-700 hover:bg-rose-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5"
-                >
-                  <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-rose-500" /> Chưa nhớ
-                  </span>
-                  <span className="text-[10px] text-rose-500 hidden sm:inline">Lặp lại sau 3 thẻ</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onRate('yellow')}
-                  className="rounded-2xl p-2.5 sm:p-3 text-center bg-amber-50/90 border border-amber-200/90 text-amber-800 hover:bg-amber-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5"
-                >
-                  <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-amber-500" /> Tạm hiểu
-                  </span>
-                  <span className="text-[10px] text-amber-600 hidden sm:inline">Ôn cuối phiên</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onRate('green')}
-                  className="rounded-2xl p-2.5 sm:p-3 text-center bg-emerald-50/90 border border-emerald-200/90 text-emerald-800 hover:bg-emerald-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5"
-                >
-                  <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Đã thuộc
-                  </span>
-                  <span className="text-[10px] text-emerald-600 hidden sm:inline">Giãn cách ôn</span>
-                </button>
-              </div>
-            ) : (
+        <div className="shrink-0 w-full max-w-2xl mx-auto pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+          {session.isFlipped ? (
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={onFlip}
-                className="w-full py-3 sm:py-3.5 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 active:scale-[0.98] text-white font-bold text-xs sm:text-sm shadow-md transition flex items-center justify-center gap-2"
+                onClick={() => onRate('red')}
+                className="rounded-2xl p-2 sm:p-2.5 text-center bg-rose-50/95 border border-rose-200/90 text-rose-700 hover:bg-rose-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5"
               >
-                <RotateCw className="w-4 h-4" />
-                <span>Chạm thẻ hoặc bấm vào đây để lật đáp án</span>
+                <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-rose-500" /> Chưa nhớ
+                </span>
+                <span className="text-[10px] text-rose-500">Vuốt trái</span>
               </button>
-            )}
-          </div>
+              <button
+                type="button"
+                onClick={() => onRate('yellow')}
+                className="rounded-2xl p-2 sm:p-2.5 text-center bg-amber-50/95 border border-amber-200/90 text-amber-800 hover:bg-amber-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5"
+              >
+                <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-amber-500" /> Tạm hiểu
+                </span>
+                <span className="text-[10px] text-amber-600">Vuốt lên / xuống</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onRate('green')}
+                className="rounded-2xl p-2 sm:p-2.5 text-center bg-emerald-50/95 border border-emerald-200/90 text-emerald-800 hover:bg-emerald-100 active:scale-95 transition shadow-sm flex flex-col items-center justify-center gap-0.5"
+              >
+                <span className="text-xs sm:text-sm font-bold flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> Đã thuộc
+                </span>
+                <span className="text-[10px] text-emerald-600">Vuốt phải</span>
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onFlip}
+              className="w-full py-2.5 sm:py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 active:scale-[0.98] text-white font-bold text-xs sm:text-sm shadow-md transition flex items-center justify-center gap-2"
+            >
+              <RotateCw className="w-4 h-4" />
+              <span>Chạm thẻ hoặc bấm vào đây để lật đáp án</span>
+            </button>
+          )}
         </div>
       )}
 

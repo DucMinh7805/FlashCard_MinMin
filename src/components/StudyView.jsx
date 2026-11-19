@@ -62,6 +62,13 @@ export default function StudyView({
   const [imgError, setImgError] = useState(false);
   const [lightboxImg, setLightboxImg] = useState(null);
 
+  // Swipe Gestures State
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [exitDirection, setExitDirection] = useState(null); // 'left' | 'right' | 'up' | 'down' | null
+  const dragStartRef = useRef({ x: 0, y: 0, time: 0 });
+  const isPointerDownRef = useRef(false);
+
   const allSessionCards = getCardsByDeckIds(session.deckIds);
   const st = computeStatsForCards(allSessionCards, progressMap);
   const isComplete = session.currentIndex >= session.queue.length;
@@ -70,7 +77,97 @@ export default function StudyView({
 
   useEffect(() => {
     setImgError(false);
+    setDragOffset({ x: 0, y: 0 });
+    setExitDirection(null);
+    setIsDragging(false);
+    isPointerDownRef.current = false;
   }, [card?.id]);
+
+  const triggerSwipe = (dir, rateColor) => {
+    if (exitDirection) return;
+    setExitDirection(dir);
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate(20);
+      } catch (_) {}
+    }
+    const targetX =
+      dir === 'right' ? window.innerWidth * 1.3 : dir === 'left' ? -window.innerWidth * 1.3 : 0;
+    const targetY =
+      dir === 'up' ? -window.innerHeight * 1.3 : dir === 'down' ? window.innerHeight * 1.3 : 0;
+    setDragOffset({ x: targetX, y: targetY });
+
+    setTimeout(() => {
+      onRate(rateColor);
+      setDragOffset({ x: 0, y: 0 });
+      setExitDirection(null);
+      setIsDragging(false);
+      isPointerDownRef.current = false;
+    }, 200);
+  };
+
+  const handlePointerDown = (e) => {
+    if (exitDirection) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    dragStartRef.current = { x: clientX, y: clientY, time: Date.now() };
+    isPointerDownRef.current = true;
+  };
+
+  const handlePointerMove = (e) => {
+    if (!isPointerDownRef.current || exitDirection) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const dx = clientX - dragStartRef.current.x;
+    const dy = clientY - dragStartRef.current.y;
+    setDragOffset({ x: dx, y: dy });
+    if (!isDragging && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+      setIsDragging(true);
+    }
+  };
+
+  const handlePointerUp = () => {
+    if (!isPointerDownRef.current) return;
+    isPointerDownRef.current = false;
+    const dx = dragOffset.x;
+    const dy = dragOffset.y;
+    const elapsed = Date.now() - dragStartRef.current.time;
+    const dist = Math.hypot(dx, dy);
+
+    // Click/Tap nhẹ (< 12px và < 350ms): lật thẻ
+    if (dist < 12 && elapsed < 350) {
+      setDragOffset({ x: 0, y: 0 });
+      setIsDragging(false);
+      onFlip();
+      return;
+    }
+
+    const SWIPE_THRESHOLD = 70;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+      if (dx > SWIPE_THRESHOLD) {
+        triggerSwipe('right', 'green'); // Vuốt phải -> Đã thuộc
+        return;
+      }
+      if (dx < -SWIPE_THRESHOLD) {
+        triggerSwipe('left', 'red'); // Vuốt trái -> Chưa nhớ
+        return;
+      }
+    } else {
+      if (dy < -SWIPE_THRESHOLD) {
+        triggerSwipe('up', 'yellow'); // Vuốt lên -> Tạm hiểu
+        return;
+      }
+      if (dy > SWIPE_THRESHOLD) {
+        triggerSwipe('down', 'yellow'); // Vuốt xuống -> Tạm hiểu
+        return;
+      }
+    }
+
+    // Không đủ khoảng cách vuốt -> Đàn hồi trở lại vị trí gốc
+    setDragOffset({ x: 0, y: 0 });
+    setIsDragging(false);
+  };
 
   useEffect(() => {
     if (!lightboxImg) return;
@@ -134,9 +231,9 @@ export default function StudyView({
   const isCaseOrLong = card?.type === 'case' || (card?.front && card.front.length > 80);
 
   return (
-    <section className="space-y-3 pb-36 sm:pb-40">
+    <section className="h-full flex-1 flex flex-col justify-between gap-2.5 pb-20 sm:pb-24">
       {/* Top Study Bar: 1 unified bar with counter, title, actions, and integrated 3px progress line */}
-      <div className="relative glass-panel rounded-2xl px-3 sm:px-4 py-2 shadow-sm border border-white/90 overflow-hidden">
+      <div className="relative glass-panel rounded-2xl px-3 sm:px-4 py-2 shadow-sm border border-white/90 overflow-hidden shrink-0">
         <div className="flex items-center justify-between gap-2">
           {/* Back button */}
           <button
@@ -204,14 +301,83 @@ export default function StudyView({
         </div>
       </div>
 
-      {/* Main Flashcard Card */}
+      {/* Swipe Gesture Hint bar */}
+      {!isComplete && card && (
+        <div className="flex items-center justify-between px-2 text-[11px] text-slate-500 font-medium select-none shrink-0">
+          <span className="flex items-center gap-1 text-rose-600 font-semibold">
+            <span>←</span> Vuốt trái: Chưa nhớ
+          </span>
+          <span className="flex items-center gap-1 text-amber-700 font-semibold">
+            <span>↕</span> Lên/Xuống: Tạm hiểu
+          </span>
+          <span className="flex items-center gap-1 text-emerald-700 font-semibold">
+            Vuốt phải: Đã thuộc <span>→</span>
+          </span>
+        </div>
+      )}
+
+      {/* Main Flashcard Card: Tràn đầy khoảng trống, căn giữa nội dung và hỗ trợ vuốt Swipe 4 hướng */}
       {!isComplete && card ? (
         <div
-          onClick={onFlip}
-          className="glass-panel rounded-3xl p-5 sm:p-7 min-h-[360px] flex flex-col justify-between cursor-pointer select-none shadow-md hover:border-sky-300 transition"
+          onTouchStart={handlePointerDown}
+          onTouchMove={handlePointerMove}
+          onTouchEnd={handlePointerUp}
+          onMouseDown={handlePointerDown}
+          onMouseMove={handlePointerMove}
+          onMouseUp={handlePointerUp}
+          style={{
+            transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) rotate(${dragOffset.x * 0.08}deg)`,
+            transition: isDragging
+              ? 'none'
+              : 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease',
+            opacity: exitDirection ? 0.3 : 1,
+          }}
+          className="glass-panel rounded-3xl p-4 sm:p-7 flex-1 min-h-0 flex flex-col justify-between select-none shadow-lg relative overflow-hidden touch-none cursor-grab active:cursor-grabbing border border-white/90"
         >
+          {/* Stamps phản hồi thị giác khi vuốt */}
+          {((dragOffset.x > 25 && !exitDirection) || exitDirection === 'right') && (
+            <div
+              style={{
+                opacity: exitDirection === 'right' ? 1 : Math.min(1, Math.max(0, (dragOffset.x - 25) / 55)),
+              }}
+              className="absolute top-6 left-6 z-30 pointer-events-none px-3.5 py-1.5 rounded-2xl border-3 border-emerald-500 bg-emerald-50/95 text-emerald-700 font-black text-sm sm:text-base uppercase tracking-wider -rotate-12 shadow-xl flex items-center gap-1.5"
+            >
+              <span>✓</span>
+              <span>ĐÃ THUỘC</span>
+            </div>
+          )}
+
+          {((dragOffset.x < -25 && !exitDirection) || exitDirection === 'left') && (
+            <div
+              style={{
+                opacity: exitDirection === 'left' ? 1 : Math.min(1, Math.max(0, (-dragOffset.x - 25) / 55)),
+              }}
+              className="absolute top-6 right-6 z-30 pointer-events-none px-3.5 py-1.5 rounded-2xl border-3 border-rose-500 bg-rose-50/95 text-rose-700 font-black text-sm sm:text-base uppercase tracking-wider rotate-12 shadow-xl flex items-center gap-1.5"
+            >
+              <span>✕</span>
+              <span>CHƯA NHỚ</span>
+            </div>
+          )}
+
+          {(((Math.abs(dragOffset.y) > 25 && Math.abs(dragOffset.y) > Math.abs(dragOffset.x)) && !exitDirection) ||
+            exitDirection === 'up' ||
+            exitDirection === 'down') && (
+            <div
+              style={{
+                opacity:
+                  exitDirection === 'up' || exitDirection === 'down'
+                    ? 1
+                    : Math.min(1, Math.max(0, (Math.abs(dragOffset.y) - 25) / 55)),
+              }}
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none px-4 py-2 rounded-2xl border-3 border-amber-500 bg-amber-50/95 text-amber-800 font-black text-sm sm:text-base uppercase tracking-wider shadow-2xl flex items-center gap-1.5"
+            >
+              <span>⚡</span>
+              <span>TẠM HIỂU</span>
+            </div>
+          )}
+
           {/* Card Top: Type badge & Status badge (NO redundant lesson name) */}
-          <div className="flex items-center justify-between gap-2 text-xs">
+          <div className="flex items-center justify-between gap-2 text-xs shrink-0">
             <span className="px-2.5 py-0.5 rounded-full glass-pill text-sky-800 font-bold border-sky-200">
               {typeLabelMap[card.type] || 'Hỏi - Đáp thường'}
             </span>
@@ -220,8 +386,8 @@ export default function StudyView({
             </span>
           </div>
 
-          {/* Card Scrollable Content Area */}
-          <div className="my-auto py-5 space-y-4 max-h-[calc(100vh-230px)] overflow-y-auto px-1 pr-1.5">
+          {/* Card Scrollable Content Area: Căn giữa nội dung, lấp đầy không gian */}
+          <div className="my-auto py-2 space-y-3 max-h-full overflow-y-auto px-1 pr-1.5 flex flex-col justify-center">
             <div className={`space-y-2 ${isCaseOrLong ? 'text-left' : 'text-center'}`}>
               <p className="text-[11px] uppercase tracking-widest text-sky-600 font-bold">
                 {card.type === 'cloze'

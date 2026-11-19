@@ -60,8 +60,7 @@ export default function App() {
   const isModalOpenRef = useRef(isModalOpen);
   isModalOpenRef.current = isModalOpen;
 
-  const isPoppingModalRef = useRef(false);
-  const isPoppingStudyRef = useRef(false);
+
 
   // Mini Drive Core Hook
   const miniDrive = useMiniDrive({
@@ -104,16 +103,23 @@ export default function App() {
     if (folderId === currentFolderIdRef.current) return;
     const hash = folderId ? `#folder=${encodeURIComponent(folderId)}` : '';
     window.history.pushState(
-      { view: 'folder', folderId },
+      { minmin: 'folder', folderId },
       '',
       window.location.pathname + hash
     );
     setCurrentFolderId(folderId);
   }, []);
 
-  // Modal History Helpers
+  // Baseline History State on initial mount
+  useEffect(() => {
+    if (!window.history.state || !window.history.state.minmin) {
+      window.history.replaceState({ minmin: 'root', folderId: null }, '');
+    }
+  }, []);
+
+  // Modal History Helpers: push state directly when opening
   const pushModalHistory = () => {
-    window.history.pushState({ view: 'modal' }, '');
+    window.history.pushState({ minmin: 'modal' }, '');
   };
 
   const openImport = () => {
@@ -156,40 +162,18 @@ export default function App() {
     setEditingCard(null);
   }, []);
 
-  const handleCloseModal = useCallback(() => {
-    closeAllModals();
-    if (window.history.state?.view === 'modal') {
-      isPoppingModalRef.current = true;
-      window.history.back();
-    }
-  }, [closeAllModals]);
-
-  // Study Session Exit with History sync
+  // Study Session Exit: updates UI state and URL hash without calling history.back()
   const handleExitStudy = useCallback(() => {
     setActiveSession(null);
-    if (window.history.state?.view === 'study') {
-      isPoppingStudyRef.current = true;
-      window.history.back();
-    } else {
-      const folderId = currentFolderIdRef.current;
-      const nextHash = folderId ? `#folder=${encodeURIComponent(folderId)}` : '';
-      window.history.replaceState(null, '', window.location.pathname + nextHash);
-    }
+    const folderId = currentFolderIdRef.current;
+    const nextHash = folderId ? `#folder=${encodeURIComponent(folderId)}` : '';
+    window.history.replaceState(null, '', window.location.pathname + nextHash);
   }, []);
 
-  // Mobile Hardware Back / PopState listener
+  // Mobile Hardware Back / PopState listener: only updates state to close modal or navigate up
   useEffect(() => {
     const handlePopState = (e) => {
-      if (isPoppingModalRef.current) {
-        isPoppingModalRef.current = false;
-        return;
-      }
-      if (isPoppingStudyRef.current) {
-        isPoppingStudyRef.current = false;
-        return;
-      }
-
-      // 1. If any modal is open -> close modal
+      // 1. If any modal is open -> close modal without exiting web
       if (isModalOpenRef.current) {
         closeAllModals();
         return;
@@ -217,7 +201,7 @@ export default function App() {
         return;
       }
 
-      // 4. If at root -> allow default browser back/exit
+      // 4. At root with no modal/study -> let browser perform default back/exit
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -590,9 +574,9 @@ export default function App() {
           showSearch={showSearch}
           setShowSearch={setShowSearch}
           analyticsOpen={analyticsOpen}
-          setAnalyticsOpen={(open) => (open ? openAnalytics() : handleCloseModal())}
+          setAnalyticsOpen={(open) => (open ? openAnalytics() : closeAllModals())}
           settingsOpen={settingsOpen}
-          setSettingsOpen={(open) => (open ? openSettings() : handleCloseModal())}
+          setSettingsOpen={(open) => (open ? openSettings() : closeAllModals())}
           appData={appData}
           progressMap={progressMap}
           onStartStudy={startStudySession}
@@ -603,7 +587,7 @@ export default function App() {
       {/* Modals & Dialogs Component */}
       <AppModals
         importOpen={importOpen}
-        setImportOpen={(open) => (open ? openImport() : handleCloseModal())}
+        setImportOpen={(open) => (open ? openImport() : closeAllModals())}
         onConfirmImport={({ parsed, selectedFolderId, deckNameInput, deckNoteInput }) => {
           handleConfirmImport({
             parsed,
@@ -612,26 +596,26 @@ export default function App() {
             deckNoteInput,
             currentFolderId,
             onComplete: (tFid) => {
-              handleCloseModal();
+              closeAllModals();
               handleSelectFolder(tFid);
             },
           });
         }}
         promptOpen={promptOpen}
-        setPromptOpen={(open) => (open ? openPrompt() : handleCloseModal())}
+        setPromptOpen={(open) => (open ? openPrompt() : closeAllModals())}
         analyticsOpen={analyticsOpen}
-        setAnalyticsOpen={(open) => (open ? openAnalytics() : handleCloseModal())}
+        setAnalyticsOpen={(open) => (open ? openAnalytics() : closeAllModals())}
         thesisDocsOpen={thesisDocsOpen}
-        setThesisDocsOpen={(open) => (open ? openThesisDocs() : handleCloseModal())}
+        setThesisDocsOpen={(open) => (open ? openThesisDocs() : closeAllModals())}
         settingsOpen={settingsOpen}
-        setSettingsOpen={(open) => (open ? openSettings() : handleCloseModal())}
+        setSettingsOpen={(open) => (open ? openSettings() : closeAllModals())}
         settings={settings}
         onUpdateSettings={updateSettings}
         onPullCloud={() => syncFromCloud(false)}
         onResetProgress={resetProgress}
         onRestoreSeedData={restoreSeedData}
         editorMode={editorMode}
-        setEditorMode={(mode) => (mode ? openEditor(mode) : handleCloseModal())}
+        setEditorMode={(mode) => (mode ? openEditor(mode) : closeAllModals())}
         editingCard={editingCard}
         setEditingCard={setEditingCard}
         selectedFolderForAction={selectedFolderForAction}
@@ -640,15 +624,15 @@ export default function App() {
         setSelectedDeckForAction={setSelectedDeckForAction}
         onSaveFolder={({ name, icon }) => {
           handleCreateFolder({ name, icon, parentId: currentFolderId });
-          handleCloseModal();
+          closeAllModals();
         }}
         onEditFolder={(folderId, data) => {
           handleEditFolder(folderId, data);
-          handleCloseModal();
+          closeAllModals();
         }}
         onMoveFolder={(folderId, targetParentId) => {
           handleMoveFolder(folderId, targetParentId);
-          handleCloseModal();
+          closeAllModals();
         }}
         onEditDeck={({ id, name, note }, openEditMode) => {
           if (openEditMode) {
@@ -659,11 +643,11 @@ export default function App() {
             return;
           }
           handleEditDeck({ id, name, note });
-          handleCloseModal();
+          closeAllModals();
         }}
         onMoveDeck={(deckId, newFolderId) => {
           handleMoveDeck(deckId, newFolderId);
-          handleCloseModal();
+          closeAllModals();
         }}
         onSaveCard={(updated) => {
           const target = editingCard || activeSession?.queue[activeSession.currentIndex];
@@ -676,7 +660,7 @@ export default function App() {
             setActiveSession(nextSession);
             safeSet(STORAGE_KEY_SESSION, nextSession);
           }
-          handleCloseModal();
+          closeAllModals();
         }}
         appData={appData}
         setAppData={setAppData}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Undo2,
@@ -115,9 +115,9 @@ export default function StudyView({
   if (card?.type === 'cloze') useReverse = false;
 
   const typeLabelMap = {
-    basic: 'Hỏi - Đáp (Basic)',
-    cloze: 'Điền khuyết (Cloze)',
-    case: 'Tình huống lâm sàng (Case)',
+    basic: 'Hỏi - Đáp thường',
+    cloze: 'Điền vào chỗ trống',
+    case: 'Ca lâm sàng',
   };
 
   const statusBadgeMap = {
@@ -213,7 +213,7 @@ export default function StudyView({
           {/* Card Top: Type badge & Status badge (NO redundant lesson name) */}
           <div className="flex items-center justify-between gap-2 text-xs">
             <span className="px-2.5 py-0.5 rounded-full glass-pill text-sky-800 font-bold border-sky-200">
-              {typeLabelMap[card.type] || 'Basic'}
+              {typeLabelMap[card.type] || 'Hỏi - Đáp thường'}
             </span>
             <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${currentBadge.bg}`}>
               {currentBadge.label}
@@ -226,13 +226,13 @@ export default function StudyView({
               <p className="text-[11px] uppercase tracking-widest text-sky-600 font-bold">
                 {card.type === 'cloze'
                   ? session.isFlipped
-                    ? 'Mặt trước • Đã điền khuyết'
+                    ? 'Mặt trước • Đã điền vào chỗ trống'
                     : 'Mặt trước • Điền vào chỗ trống [...]'
                   : card.type === 'case'
-                    ? 'Mặt trước • Tình huống lâm sàng (Case)'
+                    ? 'Mặt trước • Ca lâm sàng'
                     : useReverse
                       ? 'Chiều ngược • Đáp án → Đoán thuật ngữ'
-                      : 'Mặt trước • Thuật ngữ / Câu hỏi'}
+                      : 'Mặt trước • Câu hỏi'}
               </p>
               <div
                 className={`${
@@ -291,11 +291,11 @@ export default function StudyView({
                   className="glass-pill px-3 py-1 rounded-full text-xs font-semibold text-amber-700 border-amber-200/80 inline-flex items-center gap-1"
                 >
                   <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{session.hintVisible ? 'Ẩn gợi ý' : 'Xem gợi ý (Phím H)'}</span>
+                  <span>{session.hintVisible ? 'Ẩn gợi ý' : 'Gợi ý nhỏ (Phím H)'}</span>
                 </button>
                 {session.hintVisible && (
                   <p className="mt-2 text-xs sm:text-sm text-amber-800 bg-amber-50/90 border border-amber-300/80 rounded-xl px-3.5 py-2 max-w-lg mx-auto shadow-sm">
-                    Gợi ý: {card.hint}
+                    Gợi ý nhỏ: {card.hint}
                   </p>
                 )}
               </div>
@@ -315,7 +315,7 @@ export default function StudyView({
                 {card.extra && card.extra.trim() && (
                   <div className="glass-card rounded-2xl p-3 border-l-4 border-l-sky-500 bg-sky-50/60">
                     <p className="text-[11px] uppercase tracking-wider text-sky-700 font-bold mb-0.5">
-                      Giải thích lâm sàng / Ghi chú
+                      Giải thích thêm / Ghi chú
                     </p>
                     <div className="text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line">
                       {card.extra}

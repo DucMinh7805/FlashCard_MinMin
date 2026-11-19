@@ -18,6 +18,7 @@ import {
   User,
   Flame,
   GripVertical,
+  X,
 } from 'lucide-react';
 import { computeStatsForCards, computeStudyStreak } from '../lib/spacedRepetition';
 import ConfirmModal from './ConfirmModal';
@@ -235,102 +236,71 @@ export default function DriveExplorer({
         </div>
       </div>
 
-      {/* Hero Stats Card: Rõ ràng, trực quan, tối ưu cho cả Mobile & Desktop */}
-      <div className="glass-panel rounded-3xl p-4 sm:p-5 shadow-sm space-y-3.5 border border-white/90">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-200/80 flex items-center justify-center text-amber-700 shadow-inner">
+      {/* Compact Focus Study Bar: Tinh gọn, trực quan, không chiếm diện tích màn hình */}
+      <div className="glass-panel rounded-2xl sm:rounded-3xl p-3 sm:p-4 shadow-sm border border-white/90 space-y-2.5">
+        <div className="flex items-center justify-between gap-2.5">
+          {/* Cột trái: Streak ngọn lửa & % Đã thuộc */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-200/80 flex items-center justify-center text-amber-700 shadow-inner shrink-0">
               <Flame className="w-4 h-4 fill-current" />
             </div>
-            <div>
-              <span className="font-extrabold text-slate-800 text-sm sm:text-base">Chuỗi học tập</span>
-              <span className="ml-1.5 text-xs text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60">
-                {streak ? `${streak} ngày liên tục` : 'Bắt đầu ngay'}
-              </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-extrabold text-slate-800 text-xs sm:text-sm">
+                  {streak ? `${streak} ngày liên tục` : 'Bắt đầu học'}
+                </span>
+                <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60 shrink-0">
+                  {greenPct}% đã thuộc
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                {scopeStats.green}/{scopeStats.total} thẻ thuộc • {scopeStats.due > 0 ? <strong className="text-rose-600">{scopeStats.due} cần ôn hôm nay</strong> : <span className="text-emerald-600 font-medium">Hết thẻ cần ôn</span>}
+              </p>
             </div>
           </div>
 
-          {scopeStats.due > 0 ? (
-            <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 font-bold text-xs border border-rose-200 shadow-2xs">
-              ⚡ {scopeStats.due} thẻ cần ôn hôm nay
-            </span>
-          ) : (
-            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-xs border border-emerald-200 shadow-2xs">
-              ✨ Đã hoàn thành các thẻ hôm nay!
-            </span>
+          {/* Cột phải: CTA Button Ôn tập ngay */}
+          {scopeStats.total > 0 && (
+            <button
+              type="button"
+              onClick={() =>
+                onStartStudy({
+                  title: currentFolderObj ? `Thư mục: ${currentFolderObj.name}` : 'Toàn bộ Kho môn học',
+                  deckIds: scopeDeckIds,
+                  filterMode: scopeStats.due > 0 ? 'due' : 'all',
+                })
+              }
+              className={`py-2 px-3 sm:px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-sm transition active:scale-95 shrink-0 ${
+                scopeStats.due > 0
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-emerald-500/20'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <Play className="w-3.5 h-3.5 fill-current" />
+              <span>
+                {scopeStats.due > 0
+                  ? `ÔN NGAY (${scopeStats.due})`
+                  : `Ôn tất cả (${scopeStats.total})`}
+              </span>
+            </button>
           )}
         </div>
 
-        {/* 3 Metrics Badges */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 text-center">
-          <div className="bg-white/80 p-2.5 rounded-2xl border border-slate-200/70 shadow-2xs">
-            <p className="text-[11px] text-slate-500 font-medium">Tổng số thẻ</p>
-            <p className="text-base sm:text-xl font-extrabold text-slate-800 mt-0.5">{scopeStats.total}</p>
-            <p className="text-[10px] text-slate-400">thẻ toàn mục</p>
-          </div>
-
-          <div className="bg-rose-50/70 p-2.5 rounded-2xl border border-rose-100 shadow-2xs">
-            <p className="text-[11px] text-rose-600 font-semibold">Chưa nhớ</p>
-            <p className="text-base sm:text-xl font-extrabold text-rose-700 mt-0.5">{scopeStats.red}</p>
-            <p className="text-[10px] text-rose-500 font-medium">{scopeStats.due} cần ôn gấp</p>
-          </div>
-
-          <div className="bg-emerald-50/70 p-2.5 rounded-2xl border border-emerald-100 shadow-2xs">
-            <p className="text-[11px] text-emerald-700 font-semibold">Đã thuộc</p>
-            <p className="text-base sm:text-xl font-extrabold text-emerald-700 mt-0.5">{greenPct}%</p>
-            <p className="text-[10px] text-emerald-600 font-medium">{scopeStats.green}/{scopeStats.total} thẻ</p>
-          </div>
+        {/* Thanh Retention Progress Bar siêu mỏng 3px */}
+        <div className="w-full h-1.5 rounded-full bg-slate-200/80 overflow-hidden flex shadow-inner">
+          {scopeStats.total > 0 && scopeStats.green > 0 && (
+            <div style={{ width: `${(scopeStats.green / scopeStats.total) * 100}%` }} className="bg-emerald-500 h-full shrink-0" title={`Đã thuộc: ${scopeStats.green}`} />
+          )}
+          {scopeStats.total > 0 && scopeStats.yellow > 0 && (
+            <div style={{ width: `${(scopeStats.yellow / scopeStats.total) * 100}%` }} className="bg-amber-400 h-full shrink-0" title={`Tạm hiểu: ${scopeStats.yellow}`} />
+          )}
+          {scopeStats.total > 0 && scopeStats.red > 0 && (
+            <div style={{ width: `${(scopeStats.red / scopeStats.total) * 100}%` }} className="bg-rose-500 h-full shrink-0" title={`Chưa nhớ: ${scopeStats.red}`} />
+          )}
+          {scopeStats.total > 0 && (scopeStats.newCount || 0) > 0 && (
+            <div style={{ width: `${((scopeStats.newCount || 0) / scopeStats.total) * 100}%` }} className="bg-slate-300 h-full shrink-0" title={`Mới: ${scopeStats.newCount}`} />
+          )}
         </div>
-
-        {/* Retention Progress Bar */}
-        <div className="space-y-1.5 pt-1">
-          <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span className="flex items-center gap-2">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> {scopeStats.green} Thuộc</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> {scopeStats.yellow} Tạm hiểu</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500 inline-block" /> {scopeStats.red} Chưa nhớ</span>
-              {(scopeStats.newCount || 0) > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300 inline-block" /> {scopeStats.newCount} Mới</span>}
-            </span>
-            <span className="text-emerald-700 font-bold text-xs">{greenPct}% Ghi nhớ</span>
-          </div>
-
-          <div className="w-full h-2.5 rounded-full bg-slate-200/80 overflow-hidden flex shadow-inner">
-            {scopeStats.total > 0 && scopeStats.green > 0 && (
-              <div style={{ width: `${(scopeStats.green / scopeStats.total) * 100}%` }} className="bg-emerald-500 h-full shrink-0" />
-            )}
-            {scopeStats.total > 0 && scopeStats.yellow > 0 && (
-              <div style={{ width: `${(scopeStats.yellow / scopeStats.total) * 100}%` }} className="bg-amber-400 h-full shrink-0" />
-            )}
-            {scopeStats.total > 0 && scopeStats.red > 0 && (
-              <div style={{ width: `${(scopeStats.red / scopeStats.total) * 100}%` }} className="bg-rose-500 h-full shrink-0" />
-            )}
-            {scopeStats.total > 0 && (scopeStats.newCount || 0) > 0 && (
-              <div style={{ width: `${((scopeStats.newCount || 0) / scopeStats.total) * 100}%` }} className="bg-slate-300 h-full shrink-0" />
-            )}
-          </div>
-        </div>
-
-        {/* Quick Review Button */}
-        {scopeStats.total > 0 && (
-          <button
-            type="button"
-            onClick={() =>
-              onStartStudy({
-                title: currentFolderObj ? `Thư mục: ${currentFolderObj.name}` : 'Toàn bộ Kho môn học',
-                deckIds: scopeDeckIds,
-                filterMode: scopeStats.due > 0 ? 'due' : 'all',
-              })
-            }
-            className="w-full py-2.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition active:scale-98"
-          >
-            <Play className="w-4 h-4 fill-current" />
-            <span>
-              {scopeStats.due > 0
-                ? `ÔN TẬP NGAY (${scopeStats.due} THẺ CẦN ÔN HÔM NAY)`
-                : `ÔN TẬP TOÀN BỘ (${scopeStats.total} THẺ)`}
-            </span>
-          </button>
-        )}
       </div>
 
       {/* Global Search Results */}
@@ -443,75 +413,13 @@ export default function DriveExplorer({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setOpenMenuFolderId(isFolderMenuOpen ? null : folder.id);
+                          setOpenMenuFolderId(folder.id);
                         }}
                         className="glass-pill w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 transition active:scale-95"
                         title="Tùy chọn thư mục"
                       >
                         <MoreVertical className="w-4 h-4" />
                       </button>
-
-                      {isFolderMenuOpen && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-40"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenMenuFolderId(null);
-                            }}
-                          />
-                          <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-2xl p-1.5 z-50 shadow-2xl border border-slate-200 space-y-0.5">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenMenuFolderId(null);
-                                onEditFolder(folder);
-                              }}
-                              className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
-                            >
-                              <Edit3 className="w-3.5 h-3.5 text-sky-600" />
-                              <span>Đổi tên & biểu tượng</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenMenuFolderId(null);
-                                onMoveFolder(folder);
-                              }}
-                              className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
-                            >
-                              <FolderInput className="w-3.5 h-3.5 text-indigo-600" />
-                              <span>Di chuyển thư mục</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenMenuFolderId(null);
-                                onShareLink(`#folder=${folder.id}`, `Đã copy link chia sẻ môn "${folder.name}"`);
-                              }}
-                              className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
-                            >
-                              <Share2 className="w-3.5 h-3.5 text-sky-600" />
-                              <span>Sao chép link chia sẻ</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenMenuFolderId(null);
-                                setConfirmDelete({ type: 'folder', id: folder.id, name: folder.name });
-                              }}
-                              className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center gap-2"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                              <span>Xóa thư mục này</span>
-                            </button>
-                          </div>
-                        </>
-                      )}
                     </div>
                   </div>
 
@@ -569,7 +477,7 @@ export default function DriveExplorer({
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              Bộ thẻ bài học (Decks)
+              Bộ bài học
             </h2>
             <span className="text-xs text-slate-400 font-medium">{childDecks.length} bài học</span>
           </div>
@@ -664,91 +572,13 @@ export default function DriveExplorer({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setOpenMenuDeckId(isMenuOpen ? null : deck.id);
+                            setOpenMenuDeckId(deck.id);
                           }}
                           className="glass-pill w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 transition active:scale-95"
                           title="Tùy chọn bài học"
                         >
                           <MoreVertical className="w-4 h-4" />
                         </button>
-
-                        {isMenuOpen && (
-                          <>
-                            <div
-                              className="fixed inset-0 z-40"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenMenuDeckId(null);
-                              }}
-                            />
-                            <div className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-2xl p-1.5 z-50 shadow-2xl border border-slate-200 space-y-0.5">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenMenuDeckId(null);
-                                  onViewNote(deck);
-                                }}
-                                className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
-                              >
-                                <FileText className="w-3.5 h-3.5 text-amber-600" />
-                                <span>Ghi chú bài học (Note)</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenMenuDeckId(null);
-                                  onEditDeck(deck);
-                                }}
-                                className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
-                              >
-                                <Edit3 className="w-3.5 h-3.5 text-sky-600" />
-                                <span>Đổi tên & sửa Note</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenMenuDeckId(null);
-                                  onMoveDeck(deck);
-                                }}
-                                className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
-                              >
-                                <FolderInput className="w-3.5 h-3.5 text-indigo-600" />
-                                <span>Di chuyển sang thư mục khác</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenMenuDeckId(null);
-                                  onShareLink(`#deck=${deck.id}`, `Đã copy link chia sẻ bài "${deck.name}"`);
-                                }}
-                                className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
-                              >
-                                <Share2 className="w-3.5 h-3.5 text-sky-600" />
-                                <span>Sao chép link chia sẻ</span>
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenMenuDeckId(null);
-                                  setConfirmDelete({ type: 'deck', id: deck.id, name: deck.name });
-                                }}
-                                className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center gap-2"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                                <span>Xóa bài học này</span>
-                              </button>
-                            </div>
-                          </>
-                        )}
                       </div>
                     </div>
 
@@ -826,6 +656,187 @@ export default function DriveExplorer({
           )}
         </div>
       )}
+
+      {/* Folder Action Sheet (Mobile & Desktop) - Nổi hoàn toàn ở z-50, không bị Stacking Context và không bị BottomDock che */}
+      {(() => {
+        const folder = appData.folders.find((f) => f.id === openMenuFolderId);
+        if (!folder) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
+            <div
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+              onClick={() => setOpenMenuFolderId(null)}
+            />
+            <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-4 sm:p-5 shadow-2xl z-10 border border-slate-100 space-y-2.5 max-h-[85vh] overflow-y-auto">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="min-w-0 pr-2">
+                  <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Tùy chọn thư mục</p>
+                  <h4 className="text-sm sm:text-base font-bold text-slate-800 truncate flex items-center gap-1.5">
+                    <span>{folder.icon || '📁'}</span>
+                    <span className="truncate">{folder.name}</span>
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOpenMenuFolderId(null)}
+                  className="glass-pill w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenMenuFolderId(null);
+                    onEditFolder(folder);
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-left text-xs sm:text-sm font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2.5 transition active:scale-98"
+                >
+                  <Edit3 className="w-4 h-4 text-sky-600" />
+                  <span>Đổi tên & biểu tượng</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenMenuFolderId(null);
+                    onMoveFolder(folder);
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-left text-xs sm:text-sm font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition active:scale-98"
+                >
+                  <FolderInput className="w-4 h-4 text-indigo-600" />
+                  <span>Di chuyển thư mục</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenMenuFolderId(null);
+                    onShareLink(`#folder=${folder.id}`, `Đã copy link chia sẻ môn "${folder.name}"`);
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-left text-xs sm:text-sm font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2.5 transition active:scale-98"
+                >
+                  <Share2 className="w-4 h-4 text-sky-600" />
+                  <span>Sao chép link chia sẻ</span>
+                </button>
+
+                <div className="pt-1.5 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenMenuFolderId(null);
+                      setConfirmDelete({ type: 'folder', id: folder.id, name: folder.name });
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-left text-xs sm:text-sm font-bold text-rose-600 bg-rose-50/80 hover:bg-rose-100 flex items-center gap-2.5 transition active:scale-98 border border-rose-200/60"
+                  >
+                    <Trash2 className="w-4 h-4 text-rose-600" />
+                    <span>Xóa thư mục này</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Deck Action Sheet (Mobile & Desktop) - Nổi hoàn toàn ở z-50, không bị Stacking Context và không bị BottomDock che */}
+      {(() => {
+        const deck = appData.decks.find((d) => d.id === openMenuDeckId);
+        if (!deck) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
+            <div
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+              onClick={() => setOpenMenuDeckId(null)}
+            />
+            <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-4 sm:p-5 shadow-2xl z-10 border border-slate-100 space-y-2.5 max-h-[85vh] overflow-y-auto">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="min-w-0 pr-2">
+                  <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Tùy chọn bài học</p>
+                  <h4 className="text-sm sm:text-base font-bold text-slate-800 truncate flex items-center gap-1.5">
+                    <BookOpen className="w-4 h-4 text-sky-600 shrink-0" />
+                    <span className="truncate">{deck.name}</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{deck.cards?.length || 0} thẻ bài học</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOpenMenuDeckId(null)}
+                  className="glass-pill w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenMenuDeckId(null);
+                    onViewNote(deck);
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-left text-xs sm:text-sm font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-800 flex items-center gap-2.5 transition active:scale-98"
+                >
+                  <FileText className="w-4 h-4 text-amber-600" />
+                  <span>Ghi chú bài học (Note)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenMenuDeckId(null);
+                    onEditDeck(deck);
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-left text-xs sm:text-sm font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2.5 transition active:scale-98"
+                >
+                  <Edit3 className="w-4 h-4 text-sky-600" />
+                  <span>Đổi tên & sửa Note</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenMenuDeckId(null);
+                    onMoveDeck(deck);
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-left text-xs sm:text-sm font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition active:scale-98"
+                >
+                  <FolderInput className="w-4 h-4 text-indigo-600" />
+                  <span>Di chuyển sang thư mục khác</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenMenuDeckId(null);
+                    onShareLink(`#deck=${deck.id}`, `Đã copy link chia sẻ bài "${deck.name}"`);
+                  }}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-left text-xs sm:text-sm font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2.5 transition active:scale-98"
+                >
+                  <Share2 className="w-4 h-4 text-sky-600" />
+                  <span>Sao chép link chia sẻ</span>
+                </button>
+
+                <div className="pt-1.5 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenMenuDeckId(null);
+                      setConfirmDelete({ type: 'deck', id: deck.id, name: deck.name });
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-left text-xs sm:text-sm font-bold text-rose-600 bg-rose-50/80 hover:bg-rose-100 flex items-center gap-2.5 transition active:scale-98 border border-rose-200/60"
+                  >
+                    <Trash2 className="w-4 h-4 text-rose-600" />
+                    <span>Xóa bài học này</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Confirmation Modal */}
       <ConfirmModal

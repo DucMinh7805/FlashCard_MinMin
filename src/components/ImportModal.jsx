@@ -110,7 +110,7 @@ export default function ImportModal({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Tên bài học (Deck)</label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Tên bài học</label>
             <input
               type="text"
               value={deckName || parsed.deckName}
@@ -182,7 +182,7 @@ export default function ImportModal({
                 <>
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>
-                    Nhận diện hợp lệ <strong>{parsed.cards.length} thẻ</strong> ({clozeCount} Cloze, {caseCount} Case). Thẻ trùng câu hỏi sẽ giữ nguyên tiến độ cũ.
+                    Nhận diện hợp lệ <strong>{parsed.cards.length} thẻ</strong> ({clozeCount} Điền chỗ trống, {caseCount} Ca lâm sàng). Thẻ trùng câu hỏi sẽ giữ nguyên tiến độ cũ.
                   </span>
                 </>
               ) : (

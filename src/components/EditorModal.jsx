@@ -274,9 +274,9 @@ export default function EditorModal({
                 onChange={(e) => setType(e.target.value)}
                 className="w-full glass-input rounded-xl px-3 py-2 text-xs font-medium text-slate-800"
               >
-                <option value="basic">Basic (Hỏi - Đáp / Thuật ngữ)</option>
-                <option value="cloze">Cloze (Điền khuyết &#123;&#123;c1::...&#125;&#125;)</option>
-                <option value="case">Case (Tình huống lâm sàng)</option>
+                <option value="basic">Hỏi - Đáp thường</option>
+                <option value="cloze">Điền vào chỗ trống (bọc từ cần ẩn bằng &#123;&#123;c1::từ ẩn&#125;&#125;)</option>
+                <option value="case">Ca lâm sàng</option>
               </select>
             </div>
             <div>
@@ -299,11 +299,12 @@ export default function EditorModal({
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Gợi ý (Hint)</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Gợi ý nhỏ (xem trước khi lật)</label>
                 <input
                   type="text"
                   value={hint}
                   onChange={(e) => setHint(e.target.value)}
+                  placeholder="Gợi ý ngắn giúp nhớ lại..."
                   className="w-full glass-input rounded-xl px-2.5 py-1.5 text-xs text-slate-800"
                 />
               </div>
@@ -319,11 +320,12 @@ export default function EditorModal({
               </div>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Giải thích chi tiết / Ghi chú lâm sàng</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Giải thích thêm / Ghi chú (hiện dưới đáp án)</label>
               <textarea
                 rows={2}
                 value={extra}
                 onChange={(e) => setExtra(e.target.value)}
+                placeholder="Giải thích thêm hoặc câu ví dụ (hiện dưới đáp án)..."
                 className="w-full glass-input rounded-xl p-2.5 text-xs text-slate-800"
               />
             </div>

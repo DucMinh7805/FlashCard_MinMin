@@ -531,7 +531,13 @@ export default function App() {
       )}
 
       {/* Main Container */}
-      <main className="max-w-5xl mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-4 pb-20 sm:pb-8">
+      <main
+        className={`max-w-5xl mx-auto px-3 sm:px-4 ${
+          activeSession
+            ? 'h-[100dvh] flex flex-col py-1.5 sm:py-2 overflow-hidden'
+            : 'py-3 sm:py-4 space-y-4 pb-32 sm:pb-16'
+        }`}
+      >
         {/* Resume Banner */}
         {!activeSession && (
           <ResumeBanner

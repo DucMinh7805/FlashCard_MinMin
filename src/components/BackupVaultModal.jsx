@@ -51,6 +51,7 @@ export default function BackupVaultModal({
   onRestoreBackup,
   onExportUserProgress,
   onRestoreUserProgress,
+  onResetProgress,
 }) {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [enteredPasscode, setEnteredPasscode] = useState('');
@@ -591,6 +592,32 @@ export default function BackupVaultModal({
                   <span>Xem Raw JSON</span>
                 </button>
               </div>
+              {/* Tùy chọn Quản trị: Đặt lại toàn bộ tiến độ học */}
+              {onResetProgress && (
+                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                  <div>
+                    <span className="block text-xs font-bold text-rose-800">Đặt lại toàn bộ tiến độ học</span>
+                    <span className="text-[10px] text-slate-500">Chuyển tất cả thẻ về trạng thái Chưa học (Hộp 1)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmDialog({
+                        title: 'Đặt lại toàn bộ tiến độ học?',
+                        message: 'Tất cả thẻ sẽ được chuyển về Hộp 1 (Chưa học). Danh sách bài học và thẻ vẫn giữ nguyên.\n\nBạn có chắc chắn muốn thực hiện?',
+                        confirmText: 'Xác nhận đặt lại',
+                        action: () => {
+                          onResetProgress();
+                          setConfirmDialog(null);
+                        },
+                      });
+                    }}
+                    className="px-2.5 py-1 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition active:scale-95 shrink-0"
+                  >
+                    Đặt lại tiến độ
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -648,6 +675,32 @@ export default function BackupVaultModal({
               <div className="p-3 overflow-y-auto flex-1 font-mono text-[11px] text-slate-800 bg-slate-900 text-slate-100 whitespace-pre leading-relaxed select-text">
                 {viewingJson.jsonText}
               </div>
+              {/* Tùy chọn Quản trị: Đặt lại toàn bộ tiến độ học */}
+              {onResetProgress && (
+                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                  <div>
+                    <span className="block text-xs font-bold text-rose-800">Đặt lại toàn bộ tiến độ học</span>
+                    <span className="text-[10px] text-slate-500">Chuyển tất cả thẻ về trạng thái Chưa học (Hộp 1)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmDialog({
+                        title: 'Đặt lại toàn bộ tiến độ học?',
+                        message: 'Tất cả thẻ sẽ được chuyển về Hộp 1 (Chưa học). Danh sách bài học và thẻ vẫn giữ nguyên.\n\nBạn có chắc chắn muốn thực hiện?',
+                        confirmText: 'Xác nhận đặt lại',
+                        action: () => {
+                          onResetProgress();
+                          setConfirmDialog(null);
+                        },
+                      });
+                    }}
+                    className="px-2.5 py-1 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition active:scale-95 shrink-0"
+                  >
+                    Đặt lại tiến độ
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -683,6 +736,32 @@ export default function BackupVaultModal({
                   {confirmDialog.confirmText}
                 </button>
               </div>
+              {/* Tùy chọn Quản trị: Đặt lại toàn bộ tiến độ học */}
+              {onResetProgress && (
+                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                  <div>
+                    <span className="block text-xs font-bold text-rose-800">Đặt lại toàn bộ tiến độ học</span>
+                    <span className="text-[10px] text-slate-500">Chuyển tất cả thẻ về trạng thái Chưa học (Hộp 1)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmDialog({
+                        title: 'Đặt lại toàn bộ tiến độ học?',
+                        message: 'Tất cả thẻ sẽ được chuyển về Hộp 1 (Chưa học). Danh sách bài học và thẻ vẫn giữ nguyên.\n\nBạn có chắc chắn muốn thực hiện?',
+                        confirmText: 'Xác nhận đặt lại',
+                        action: () => {
+                          onResetProgress();
+                          setConfirmDialog(null);
+                        },
+                      });
+                    }}
+                    className="px-2.5 py-1 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition active:scale-95 shrink-0"
+                  >
+                    Đặt lại tiến độ
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

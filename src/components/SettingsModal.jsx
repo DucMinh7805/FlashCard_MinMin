@@ -4,12 +4,8 @@ import {
   User,
   Cloud,
   RefreshCw,
-  Flame,
   Check,
-  AlertTriangle,
-  HardDrive,
   Settings,
-  Sparkles,
   Database,
 } from 'lucide-react';
 import TikTokFlame from './TikTokFlame';
@@ -20,7 +16,6 @@ export default function SettingsModal({
   settings,
   onUpdateSettings,
   onPullCloud,
-  onResetProgress,
   onOpenBackupVault,
   showToast,
 }) {
@@ -28,26 +23,21 @@ export default function SettingsModal({
   const [dailyGoal, setDailyGoal] = useState(settings?.dailyGoal || 30);
   const [isPulling, setIsPulling] = useState(false);
   const [justSavedName, setJustSavedName] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState(null);
 
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        if (confirmDialog) setConfirmDialog(null);
-        else onClose();
-      }
+      if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose, confirmDialog]);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (isOpen) {
       setStudentName(settings?.studentName || 'Học viên');
       setDailyGoal(settings?.dailyGoal || 30);
       setJustSavedName(false);
-      setConfirmDialog(null);
     }
   }, [isOpen, settings]);
 
@@ -75,19 +65,6 @@ export default function SettingsModal({
     } finally {
       setIsPulling(false);
     }
-  };
-
-  const requestResetProgress = () => {
-    setConfirmDialog({
-      title: 'Đặt lại toàn bộ tiến độ học?',
-      message:
-        'Tất cả flashcard sẽ được chuyển về Hộp 1 (Chưa học). Danh sách bài học, thư mục và câu hỏi vẫn được giữ nguyên vẹn.\n\nBạn có chắc chắn muốn học lại từ đầu?',
-      confirmText: 'Xác nhận đặt lại',
-      action: () => {
-        onResetProgress();
-        setConfirmDialog(null);
-      },
-    });
   };
 
   const userInitial = (studentName.trim() || 'H').charAt(0).toUpperCase();
@@ -123,7 +100,7 @@ export default function SettingsModal({
           </button>
         </div>
 
-        {/* Content (Gọn gàng, không cần cuộn) */}
+        {/* Content (Cực kỳ gọn nhẹ, 100% tích cực, không nút nguy hiểm) */}
         <div className="p-4 sm:p-5 overflow-y-auto space-y-3">
           {/* 1. Tên thành viên */}
           <div className="glass-card bg-slate-50/70 rounded-2xl p-3 border border-slate-200/80 space-y-2">
@@ -229,28 +206,9 @@ export default function SettingsModal({
             </div>
           </div>
 
-          {/* 4. Đặt lại tiến độ (An toàn) */}
-          <div className="rounded-2xl p-2.5 sm:p-3 border border-rose-200 bg-rose-50/50 flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <span className="block text-xs font-bold text-rose-900 leading-tight">
-                Học lại từ đầu?
-              </span>
-              <span className="text-[10px] text-rose-600/90 leading-tight block mt-0.5 truncate">
-                Chuyển tất cả thẻ về Chưa học (Hộp 1)
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={requestResetProgress}
-              className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-rose-700 bg-white hover:bg-rose-100 border border-rose-300 shadow-sm transition active:scale-95 shrink-0 whitespace-nowrap"
-            >
-              Đặt lại tiến độ
-            </button>
-          </div>
-
-          {/* 5. Chân modal: Liên kết ra ngoài lề (Kho dự phòng) */}
+          {/* 4. Chân modal: Liên kết ra ngoài lề (Kho dữ liệu hệ thống) */}
           {onOpenBackupVault && (
-            <div className="pt-1 text-center">
+            <div className="pt-2 text-center border-t border-slate-100">
               <button
                 type="button"
                 onClick={onOpenBackupVault}
@@ -263,41 +221,6 @@ export default function SettingsModal({
             </div>
           )}
         </div>
-
-        {/* Safety Confirmation Dialog */}
-        {confirmDialog && (
-          <div className="absolute inset-0 z-30 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-            <div className="bg-white rounded-2xl max-w-sm w-full p-4 space-y-3 shadow-2xl border border-slate-100 animate-scaleUp">
-              <div className="flex items-center gap-2.5 text-slate-800">
-                <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-4 h-4" />
-                </div>
-                <h4 className="text-xs sm:text-sm font-bold">{confirmDialog.title}</h4>
-              </div>
-
-              <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line pl-1">
-                {confirmDialog.message}
-              </p>
-
-              <div className="flex items-center justify-end gap-2 pt-1.5">
-                <button
-                  type="button"
-                  onClick={() => setConfirmDialog(null)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 transition"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmDialog.action}
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 shadow-sm transition active:scale-95"
-                >
-                  {confirmDialog.confirmText}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

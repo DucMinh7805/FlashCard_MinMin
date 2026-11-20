@@ -203,7 +203,6 @@ export default function AppModals({
         showToast={showToast}
         onUpdateSettings={onUpdateSettings}
         onPullCloud={onPullCloud}
-        onResetProgress={onResetProgress}
         onOpenBackupVault={() => {
           setSettingsOpen(false);
           setBackupVaultOpen(true);
@@ -224,6 +223,7 @@ export default function AppModals({
         onRestoreBackup={handleRestoreBackup}
         onExportUserProgress={handleExportUserProgress}
         onRestoreUserProgress={handleRestoreUserProgress}
+        onResetProgress={onResetProgress}
       />
 
       <AnalyticsModal

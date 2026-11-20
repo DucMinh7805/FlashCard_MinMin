@@ -10,6 +10,7 @@ import {
   HardDrive,
   Settings,
   Sparkles,
+  Database,
 } from 'lucide-react';
 import TikTokFlame from './TikTokFlame';
 
@@ -255,9 +256,9 @@ export default function SettingsModal({
                 onClick={onOpenBackupVault}
                 className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 hover:text-sky-700 transition"
               >
-                <HardDrive className="w-3.5 h-3.5 text-slate-400" />
-                <span>Xem link Google Drive, Sheets dự phòng?</span>
-                <span className="text-sky-600 underline underline-offset-2">Mở Kho dự phòng ↗</span>
+                <Database className="w-3.5 h-3.5 text-slate-400" />
+                <span>Xem bản sao lưu & Dữ liệu hệ thống?</span>
+                <span className="text-sky-600 underline underline-offset-2">Mở Kho dữ liệu ↗</span>
               </button>
             </div>
           )}

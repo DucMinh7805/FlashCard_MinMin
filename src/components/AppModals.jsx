@@ -210,10 +210,15 @@ export default function AppModals({
         }}
       />
 
-      {/* Kho dự phòng riêng biệt ở ngoài lề */}
+      {/* Kho dữ liệu hệ thống riêng biệt ở ngoài lề */}
       <BackupVaultModal
         isOpen={backupVaultOpen}
         onClose={() => setBackupVaultOpen(false)}
+        appData={appData}
+        setAppData={setAppData}
+        progressMap={progressMap}
+        setProgressMap={setProgressMap}
+        settings={settings}
         showToast={showToast}
         onExportBackup={handleExportBackup}
         onRestoreBackup={handleRestoreBackup}

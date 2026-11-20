@@ -9,6 +9,7 @@ import {
   Sparkles,
   X,
   HardDrive,
+  Database,
 } from 'lucide-react';
 
 export default function Header({
@@ -144,10 +145,10 @@ export default function Header({
                       }}
                       className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2 border-t border-slate-100 mt-1 pt-2"
                     >
-                      <HardDrive className="w-4 h-4 text-indigo-600" />
+                      <Database className="w-4 h-4 text-indigo-600" />
                       <div>
-                        <span className="block font-bold">Kho dữ liệu & Link dự phòng</span>
-                        <span className="text-[10px] text-slate-400 block">Google Drive, Sheets (Khóa mã)</span>
+                        <span className="block font-bold">Kho dữ liệu Hệ thống</span>
+                        <span className="text-[10px] text-slate-400 block">Bản sao lưu & Cứu hộ JSON (Khóa mã)</span>
                       </div>
                     </button>
                   )}

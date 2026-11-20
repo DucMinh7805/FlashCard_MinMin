@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { computeStatsForCards, computeStudyStreak } from '../lib/spacedRepetition';
 import ConfirmModal from './ConfirmModal';
+import TikTokFlame from './TikTokFlame';
 
 function stripCloze(text) {
   return (text || '').replace(/\{\{c\d+::(.*?)\}\}/g, '$1');
@@ -242,12 +243,18 @@ export default function DriveExplorer({
         <div className="flex items-center justify-between gap-2.5">
           {/* Cột trái: Streak ngọn lửa & % Đã thuộc */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-200/80 flex items-center justify-center text-amber-700 shadow-inner shrink-0">
-              <Flame className="w-4 h-4 fill-current" />
+            <div className="shrink-0 flex items-center justify-center">
+              <TikTokFlame streak={streak} size="md" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="font-extrabold text-slate-800 text-xs sm:text-sm">
+                <span
+                  className={`font-black text-xs sm:text-sm ${
+                    streak
+                      ? 'bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 bg-clip-text text-transparent'
+                      : 'text-slate-700'
+                  }`}
+                >
                   {streak ? `${streak} ngày liên tục` : 'Bắt đầu học'}
                 </span>
                 {deviceId && (

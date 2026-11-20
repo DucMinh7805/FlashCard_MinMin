@@ -160,3 +160,46 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.65);
 }
+
+/* TikTok Streak Flame Animations */
+@keyframes tiktokFlameBounce {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+  }
+  20% {
+    transform: scale(1.12, 0.94) rotate(-3deg);
+  }
+  45% {
+    transform: scale(0.96, 1.08) rotate(2deg);
+  }
+  70% {
+    transform: scale(1.06, 0.98) rotate(-1deg);
+  }
+}
+
+@keyframes tiktokFlameGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px rgba(255, 75, 0, 0.7)) drop-shadow(0 0 12px rgba(255, 170, 0, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(255, 45, 0, 0.95)) drop-shadow(0 0 18px rgba(255, 200, 0, 0.6));
+  }
+}
+
+.tiktok-flame-active {
+  animation: tiktokFlameBounce 1.4s infinite ease-in-out, tiktokFlameGlow 1.8s infinite ease-in-out;
+  transform-origin: bottom center;
+}
+
+@keyframes shakeError {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+
+.shake-animation {
+  animation: shakeError 0.4s ease-in-out;
+}
+

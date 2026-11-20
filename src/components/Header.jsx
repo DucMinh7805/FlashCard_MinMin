@@ -8,6 +8,7 @@ import {
   FolderPlus,
   Sparkles,
   X,
+  HardDrive,
 } from 'lucide-react';
 
 export default function Header({
@@ -26,6 +27,7 @@ export default function Header({
   onOpenNewFolder,
   onOpenPrompt,
   onOpenSettings,
+  onOpenBackupVault,
 }) {
   return (
     <header className={`sticky top-0 px-3 sm:px-4 pt-2.5 pb-2 transition-all ${plusMenuOpen ? 'z-50' : 'z-30'}`}>
@@ -133,6 +135,22 @@ export default function Header({
                     <Sparkles className="w-4 h-4 text-amber-500" />
                     <span>Prompt tạo thẻ AI</span>
                   </button>
+                  {onOpenBackupVault && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPlusMenuOpen(false);
+                        onOpenBackupVault();
+                      }}
+                      className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2 border-t border-slate-100 mt-1 pt-2"
+                    >
+                      <HardDrive className="w-4 h-4 text-indigo-600" />
+                      <div>
+                        <span className="block font-bold">Kho dữ liệu & Link dự phòng</span>
+                        <span className="text-[10px] text-slate-400 block">Google Drive, Sheets (Khóa mã)</span>
+                      </div>
+                    </button>
+                  )}
                 </div>
               </>
             )}
@@ -142,7 +160,7 @@ export default function Header({
             type="button"
             onClick={onOpenSettings}
             className="glass-pill w-8 h-8 sm:w-9 sm:h-9 rounded-xl text-slate-600 hover:text-slate-900 flex items-center justify-center transition"
-            title="Cài đặt & Đồng bộ Cloud"
+            title="Cài đặt học tập"
           >
             <Settings className="w-4 h-4" />
           </button>

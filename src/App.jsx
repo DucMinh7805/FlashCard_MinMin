@@ -71,6 +71,7 @@ export default function App() {
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [thesisDocsOpen, setThesisDocsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [backupVaultOpen, setBackupVaultOpen] = useState(false);
 
   // Action / Editor state
   const [editorMode, setEditorMode] = useState(null);
@@ -91,6 +92,7 @@ export default function App() {
     analyticsOpen ||
     thesisDocsOpen ||
     settingsOpen ||
+    backupVaultOpen ||
     editorMode ||
     plusMenuOpen
   );
@@ -180,6 +182,10 @@ export default function App() {
     pushModalHistory();
     setSettingsOpen(true);
   };
+  const openBackupVault = () => {
+    pushModalHistory();
+    setBackupVaultOpen(true);
+  };
   const openEditor = (mode, folder = null, deck = null, card = null) => {
     pushModalHistory();
     setSelectedFolderForAction(folder);
@@ -195,6 +201,7 @@ export default function App() {
     setAnalyticsOpen(false);
     setThesisDocsOpen(false);
     setSettingsOpen(false);
+    setBackupVaultOpen(false);
     setEditorMode(null);
     setSelectedFolderForAction(null);
     setSelectedDeckForAction(null);
@@ -528,6 +535,7 @@ export default function App() {
           onOpenNewFolder={() => openEditor('new_folder')}
           onOpenPrompt={openPrompt}
           onOpenSettings={openSettings}
+          onOpenBackupVault={openBackupVault}
         />
       )}
 
@@ -675,6 +683,8 @@ export default function App() {
         setThesisDocsOpen={(open) => (open ? openThesisDocs() : closeAllModals())}
         settingsOpen={settingsOpen}
         setSettingsOpen={(open) => (open ? openSettings() : closeAllModals())}
+        backupVaultOpen={backupVaultOpen}
+        setBackupVaultOpen={(open) => (open ? openBackupVault() : closeAllModals())}
         settings={settings}
         onUpdateSettings={updateSettings}
         onPullCloud={() => syncFromCloud(false)}

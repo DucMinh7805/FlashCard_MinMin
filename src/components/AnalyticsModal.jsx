@@ -12,6 +12,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { computeStatsForCards, computeStudyStreak } from '../lib/spacedRepetition';
+import TikTokFlame from './TikTokFlame';
 
 export default function AnalyticsModal({
   isOpen,
@@ -108,13 +109,15 @@ export default function AnalyticsModal({
         <div className="p-4 sm:p-6 overflow-y-auto space-y-4">
           {/* 4 Summary Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <div className="glass-card rounded-2xl p-3 flex flex-col justify-between border-amber-200/80 bg-amber-50/40">
-              <div className="flex items-center justify-between text-amber-600">
+            <div className="glass-card rounded-2xl p-3 flex flex-col justify-between border-amber-300/80 bg-gradient-to-br from-amber-50/80 to-orange-50/50 shadow-sm relative overflow-hidden">
+              <div className="flex items-center justify-between text-amber-700">
                 <span className="text-[11px] font-bold uppercase tracking-wider">Streak</span>
-                <Flame className="w-4 h-4 fill-current" />
+                <TikTokFlame streak={streak} size="sm" />
               </div>
-              <p className="text-xl sm:text-2xl font-black text-amber-700 mt-1">{streak} ngày</p>
-              <p className="text-[10px] text-amber-600/80 mt-0.5">Liên tục ôn tập</p>
+              <p className="text-xl sm:text-2xl font-black bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 bg-clip-text text-transparent mt-1">
+                {streak} ngày
+              </p>
+              <p className="text-[10px] text-amber-700/80 font-medium mt-0.5">Liên tục ôn tập</p>
             </div>
 
             <div className="glass-card rounded-2xl p-3 flex flex-col justify-between border-sky-200/80 bg-sky-50/40">

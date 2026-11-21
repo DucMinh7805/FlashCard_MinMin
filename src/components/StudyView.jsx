@@ -440,6 +440,7 @@ export default function StudyView({
         onViewDeckNote={onViewDeckNote}
         onShuffle={onShuffle}
         onEditCard={onEditCard}
+        onRestartSession={onRestartSession}
       />
 
       {/* Lightbox Zoom Overlay */}

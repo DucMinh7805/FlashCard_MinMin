@@ -1,5 +1,5 @@
 import React from 'react';
-import { SlidersHorizontal, X, FileText, Shuffle, Edit3 } from 'lucide-react';
+import { SlidersHorizontal, X, FileText, Shuffle, Edit3, RotateCcw } from 'lucide-react';
 
 export default function StudyOptionsSheet({
   isOpen,
@@ -13,6 +13,7 @@ export default function StudyOptionsSheet({
   onViewDeckNote,
   onShuffle,
   onEditCard,
+  onRestartSession,
 }) {
   if (!isOpen) return null;
 
@@ -125,6 +126,18 @@ export default function StudyOptionsSheet({
               </button>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              onRestartSession?.('all');
+            }}
+            className="w-full py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition border border-slate-200"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+            <span>Bắt đầu lại bài học từ đầu (Câu 1)</span>
+          </button>
         </div>
 
         <button

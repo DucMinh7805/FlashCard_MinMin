@@ -6,6 +6,7 @@ import SettingsModal from './SettingsModal';
 import BackupVaultModal from './BackupVaultModal';
 import AnalyticsModal from './AnalyticsModal';
 import ThesisDocsModal from './ThesisDocsModal';
+import ResumePromptModal from './study/ResumePromptModal';
 import { pushCloudData } from '../lib/supabase';
 import {
   STORAGE_KEY_CONTENT,
@@ -69,6 +70,11 @@ export default function AppModals({
   onStartStudy,
   showToast,
   activeSession,
+  // Resume Prompt
+  resumePromptData,
+  onConfirmResume,
+  onConfirmRestart,
+  onCloseResumePrompt,
 }) {
   const handleExportBackup = () => {
     const blob = new Blob(
@@ -240,6 +246,15 @@ export default function AppModals({
       />
 
       <ThesisDocsModal isOpen={thesisDocsOpen} onClose={() => setThesisDocsOpen(false)} />
+
+      {/* Hộp thoại hỏi có tiếp tục học ở câu dở dang hay không */}
+      <ResumePromptModal
+        isOpen={Boolean(resumePromptData)}
+        sessionData={resumePromptData?.sessionData}
+        onResume={onConfirmResume}
+        onRestart={onConfirmRestart}
+        onClose={onCloseResumePrompt}
+      />
     </>
   );
 }

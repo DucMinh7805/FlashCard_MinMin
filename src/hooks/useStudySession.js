@@ -31,6 +31,7 @@ export function useStudySession({
     const saved = safeGet(STORAGE_KEY_SESSION, null);
     return saved?.queue && saved.currentIndex < saved.queue.length ? saved : null;
   });
+  const [resumePromptData, setResumePromptData] = useState(null);
   const [undoStack, setUndoStack] = useState([]);
 
   // Study Session Exit: updates UI state and URL hash without calling history.back()
@@ -54,6 +55,23 @@ export function useStudySession({
         showToast(`Bài "${deck.name}" chưa có thẻ nào để học!`);
         return true;
       }
+
+      // Tự động khôi phục câu đang học dở nếu bị reload hoặc out màn hình
+      const saved = safeGet(STORAGE_KEY_SESSION, null);
+      if (
+        saved &&
+        saved.deckIds?.length === 1 &&
+        saved.deckIds[0] === deck.id &&
+        saved.currentIndex > 0 &&
+        saved.currentIndex < (saved.queue?.length || 0)
+      ) {
+        setActiveSession(saved);
+        setUndoStack([]);
+        setResumeCandidate(saved);
+        showToast(`Đang tiếp tục ở câu ${saved.currentIndex + 1} / ${saved.queue.length}`);
+        return true;
+      }
+
       const nextSession = {
         title: deck.name,
         deckIds: [deck.id],
@@ -87,6 +105,7 @@ export function useStudySession({
       filterMode = 'all',
       direction = 'front_to_back',
       resumeState = null,
+      forceRestart = false,
     }) => {
       if (resumeState) {
         window.history.pushState(
@@ -98,6 +117,27 @@ export function useStudySession({
         setUndoStack([]);
         return;
       }
+
+      // Kiểm tra nếu có lượt học dở dang: hiện hộp thoại checkbox tròn hỏi người dùng
+      if (!forceRestart) {
+        const saved = safeGet(STORAGE_KEY_SESSION, null);
+        const isMatch =
+          saved &&
+          saved.deckIds &&
+          saved.deckIds.length === deckIds.length &&
+          saved.deckIds.every((id) => deckIds.includes(id)) &&
+          saved.currentIndex > 0 &&
+          saved.currentIndex < (saved.queue?.length || 0);
+
+        if (isMatch) {
+          setResumePromptData({
+            sessionData: saved,
+            pendingConfig: { title, deckIds, filterMode, direction },
+          });
+          return;
+        }
+      }
+
       const allCards = getCardsByDeckIds(deckIds);
       if (allCards.length === 0) return showToast('Chưa có thẻ nào trong mục này để học!');
 
@@ -325,12 +365,35 @@ export function useStudySession({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleFlip, handleRate, handleUndo, handleToggleHint]);
 
+  const confirmResume = useCallback(
+    (sessionData) => {
+      setResumePromptData(null);
+      startStudySession({ resumeState: sessionData });
+    },
+    [startStudySession]
+  );
+
+  const confirmRestart = useCallback(() => {
+    if (!resumePromptData) return;
+    const config = resumePromptData.pendingConfig;
+    setResumePromptData(null);
+    startStudySession({ ...config, forceRestart: true });
+  }, [resumePromptData, startStudySession]);
+
+  const closeResumePrompt = useCallback(() => {
+    setResumePromptData(null);
+  }, []);
+
   return {
     activeSession,
     setActiveSession,
     activeSessionRef,
     resumeCandidate,
     setResumeCandidate,
+    resumePromptData,
+    confirmResume,
+    confirmRestart,
+    closeResumePrompt,
     undoStack,
     setUndoStack,
     handleExitStudy,

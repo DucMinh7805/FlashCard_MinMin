@@ -128,6 +128,10 @@ export default function App() {
     activeSessionRef,
     resumeCandidate,
     setResumeCandidate,
+    resumePromptData,
+    confirmResume,
+    confirmRestart,
+    closeResumePrompt,
     undoStack,
     handleExitStudy,
     openDeckDirectly,
@@ -176,30 +180,12 @@ export default function App() {
     window.history.pushState({ minmin: 'modal' }, '', '#modal');
   };
 
-  const openImport = () => {
-    pushModalHistory();
-    setImportOpen(true);
-  };
-  const openPrompt = () => {
-    pushModalHistory();
-    setPromptOpen(true);
-  };
-  const openAnalytics = () => {
-    pushModalHistory();
-    setAnalyticsOpen(true);
-  };
-  const openThesisDocs = () => {
-    pushModalHistory();
-    setThesisDocsOpen(true);
-  };
-  const openSettings = () => {
-    pushModalHistory();
-    setSettingsOpen(true);
-  };
-  const openBackupVault = () => {
-    pushModalHistory();
-    setBackupVaultOpen(true);
-  };
+  const openImport = () => { pushModalHistory(); setImportOpen(true); };
+  const openPrompt = () => { pushModalHistory(); setPromptOpen(true); };
+  const openAnalytics = () => { pushModalHistory(); setAnalyticsOpen(true); };
+  const openThesisDocs = () => { pushModalHistory(); setThesisDocsOpen(true); };
+  const openSettings = () => { pushModalHistory(); setSettingsOpen(true); };
+  const openBackupVault = () => { pushModalHistory(); setBackupVaultOpen(true); };
   const openEditor = (mode, folder = null, deck = null, card = null) => {
     pushModalHistory();
     setEditorMode(mode);
@@ -504,10 +490,7 @@ export default function App() {
           handleEditDeck({ id, name, note });
           closeAllModals();
         }}
-        onMoveDeck={(deckId, newFolderId) => {
-          handleMoveDeck(deckId, newFolderId);
-          closeAllModals();
-        }}
+        onMoveDeck={(deckId, newFolderId) => { handleMoveDeck(deckId, newFolderId); closeAllModals(); }}
         onSaveCard={(updated) => {
           const target = editingCard || activeSession?.queue[activeSession.currentIndex];
           if (!target) return;
@@ -534,6 +517,10 @@ export default function App() {
         onStartStudy={startStudySession}
         showToast={showToast}
         activeSession={activeSession}
+        resumePromptData={resumePromptData}
+        onConfirmResume={confirmResume}
+        onConfirmRestart={confirmRestart}
+        onCloseResumePrompt={closeResumePrompt}
       />
 
       {/* Toast Notification */}

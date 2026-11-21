@@ -333,99 +333,103 @@ export default function StudyView({
   const isCaseOrLong = card?.type === 'case' || (card?.front && card.front.length > 80);
 
   return (
-    <section className="fixed inset-0 z-50 flex flex-col justify-between p-2.5 sm:p-4 bg-gradient-to-br from-slate-100/95 via-sky-50/50 to-indigo-50/50 backdrop-blur-2xl overflow-hidden overscroll-none touch-none select-none h-[100dvh] w-screen">
-      {/* Top Study Bar */}
-      <StudyHeader
-        session={session}
-        isComplete={isComplete}
-        pct={pct}
-        st={st}
-        undoCount={undoCount}
-        onExit={onExit}
-        onUndo={onUndo}
-        setOptionsOpen={setOptionsOpen}
-      />
-
-      {/* Swipe Gesture & Tap Hint bar: Đồng nhất mặt trước & mặt sau */}
-      {!isComplete && card && <StudyGestureHintBar isFlipped={session.isFlipped} />}
-
-      {/* Main Flashcard Card: Tràn đầy khoảng trống, chạm để lật và vuốt Swipe 4 hướng */}
-      {!isComplete && card ? (
-        <div
-          ref={cardElementRef}
-          draggable={false}
-          onDragStart={(e) => e.preventDefault()}
-          onClick={(e) => {
-            if (e.target.closest('button') || e.target.closest('a')) return;
-            if (suppressClickRef.current || wasSwipeRef.current || hasMovedRef.current) return;
-            triggerFlip();
-          }}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={endDrag}
-          onPointerCancel={handlePointerCancel}
-          style={{
-            transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) rotate(${dragOffset.x * 0.065}deg)`,
-            transition: isDragging
-              ? 'none'
-              : 'transform 0.22s cubic-bezier(0.18, 0.89, 0.32, 1.28), opacity 0.18s ease',
-            opacity: exitDirection ? 0.15 : 1,
-            willChange: 'transform, opacity',
-            WebkitBackfaceVisibility: 'hidden',
-            backfaceVisibility: 'hidden',
-          }}
-          className="glass-panel rounded-3xl p-4 sm:p-7 flex-1 min-h-0 flex flex-col justify-between select-none shadow-lg relative overflow-hidden cursor-pointer border border-white/90 active:scale-[0.995] transition-transform touch-none"
-        >
-          {/* Stamps phản hồi thị giác khi vuốt */}
-          <SwipeStamps dragOffset={dragOffset} exitDirection={exitDirection} />
-
-          {/* Card Top: Type badge & Metallic Status badge */}
-          <div className="flex items-center justify-between gap-2 text-xs shrink-0 pointer-events-none">
-            <span className="px-2.5 py-0.5 rounded-full glass-pill text-sky-800 font-bold border-sky-200">
-              {typeLabelMap[card.type] || 'Hỏi - Đáp thường'}
-            </span>
-            <CardStatusBadge prog={prog} repCount={repCount} />
-          </div>
-
-          {/* Card Content Area */}
-          <div
-            ref={cardScrollRef}
-            className="my-auto py-2 space-y-3 max-h-full overflow-y-auto px-1 pr-1.5 flex flex-col justify-center select-none pointer-events-none"
-          >
-            <CardQuestionArea
-              card={card}
-              session={session}
-              useReverse={useReverse}
-              isCaseOrLong={isCaseOrLong}
-              imgError={imgError}
-              setImgError={setImgError}
-              setLightboxImg={setLightboxImg}
-              onToggleHint={onToggleHint}
-            />
-
-            {/* Flipped Answer Area */}
-            <CardAnswerArea session={session} card={card} useReverse={useReverse} />
-          </div>
-
-          {/* Desktop Keyboard Hints Footer (Ẩn trên điện thoại) */}
-          <div className="hidden md:flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-100 pointer-events-none">
-            <span>
-              {session.isFlipped
-                ? 'Vuốt thẻ hoặc phím (1: Chưa nhớ, 2: Tạm hiểu, 3: Đã thuộc)'
-                : 'Chạm thẻ hoặc phím Space để lật đáp án'}
-            </span>
-            <span>Phím tắt: Space (Lật) • 1 (Đỏ) • 2 (Vàng) • 3 (Xanh) • Z (Undo)</span>
-          </div>
-        </div>
-      ) : (
-        <StudyCompletionCard
-          st={st}
-          allSessionCards={allSessionCards}
+    <section className="fixed inset-0 z-50 flex flex-col items-center justify-between p-2 sm:p-4 md:py-6 bg-gradient-to-br from-slate-100/95 via-sky-50/50 to-indigo-50/50 backdrop-blur-2xl overflow-hidden overscroll-none touch-none select-none h-[100dvh] w-screen">
+      <div className="w-full max-w-2xl lg:max-w-3xl flex flex-col justify-between flex-1 min-h-0 h-full mx-auto">
+        {/* Top Study Bar */}
+        <StudyHeader
           session={session}
-          onRestartSession={onRestartSession}
+          isComplete={isComplete}
+          pct={pct}
+          st={st}
+          undoCount={undoCount}
           onExit={onExit}
+          onUndo={onUndo}
+          setOptionsOpen={setOptionsOpen}
         />
-      )}
+
+        {/* Swipe Gesture & Tap Hint bar: Đồng nhất mặt trước & mặt sau */}
+        {!isComplete && card && <StudyGestureHintBar isFlipped={session.isFlipped} />}
+
+        {/* Main Flashcard Card: Tràn đầy khoảng trống, chạm để lật và vuốt Swipe 4 hướng */}
+        {!isComplete && card ? (
+          <div
+            ref={cardElementRef}
+            draggable={false}
+            onDragStart={(e) => e.preventDefault()}
+            onClick={(e) => {
+              if (e.target.closest('button') || e.target.closest('a')) return;
+              if (suppressClickRef.current || wasSwipeRef.current || hasMovedRef.current) return;
+              triggerFlip();
+            }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={handlePointerCancel}
+            style={{
+              transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) rotate(${dragOffset.x * 0.065}deg)`,
+              transition: isDragging
+                ? 'none'
+                : 'transform 0.22s cubic-bezier(0.18, 0.89, 0.32, 1.28), opacity 0.18s ease',
+              opacity: exitDirection ? 0.15 : 1,
+              willChange: 'transform, opacity',
+              WebkitBackfaceVisibility: 'hidden',
+              backfaceVisibility: 'hidden',
+            }}
+            className="glass-panel rounded-3xl p-4 sm:p-7 md:p-8 flex-1 min-h-0 md:max-h-[660px] md:my-auto flex flex-col justify-between select-none shadow-xl relative overflow-hidden cursor-pointer border border-white/90 active:scale-[0.995] transition-transform touch-none"
+          >
+            {/* Stamps phản hồi thị giác khi vuốt */}
+            <SwipeStamps dragOffset={dragOffset} exitDirection={exitDirection} />
+
+            {/* Card Top: Type badge & Metallic Status badge */}
+            <div className="flex items-center justify-between gap-2 text-xs shrink-0 pointer-events-none mb-2">
+              <span className="px-2.5 py-0.5 rounded-full glass-pill text-sky-800 font-bold border-sky-200">
+                {typeLabelMap[card.type] || 'Hỏi - Đáp thường'}
+              </span>
+              <CardStatusBadge prog={prog} repCount={repCount} />
+            </div>
+
+            {/* Card Content Area */}
+            <div
+              ref={cardScrollRef}
+              className="my-auto py-2 space-y-3 max-h-full overflow-y-auto px-1 pr-1.5 flex flex-col justify-center select-none pointer-events-none"
+            >
+              <CardQuestionArea
+                card={card}
+                session={session}
+                useReverse={useReverse}
+                isCaseOrLong={isCaseOrLong}
+                imgError={imgError}
+                setImgError={setImgError}
+                setLightboxImg={setLightboxImg}
+                onToggleHint={onToggleHint}
+              />
+
+              {/* Flipped Answer Area */}
+              <CardAnswerArea session={session} card={card} useReverse={useReverse} />
+            </div>
+
+            {/* Desktop Keyboard Hints Footer (Ẩn trên điện thoại) */}
+            <div className="hidden md:flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-100 pointer-events-none">
+              <span>
+                {session.isFlipped
+                  ? 'Vuốt thẻ hoặc phím (1: Chưa nhớ, 2: Tạm hiểu, 3: Đã thuộc)'
+                  : 'Chạm thẻ hoặc phím Space để lật đáp án'}
+              </span>
+              <span>Phím tắt: Space (Lật) • 1 (Đỏ) • 2 (Vàng) • 3 (Xanh) • Z (Undo)</span>
+            </div>
+          </div>
+        ) : (
+          <div className="my-auto">
+            <StudyCompletionCard
+              st={st}
+              allSessionCards={allSessionCards}
+              session={session}
+              onRestartSession={onRestartSession}
+              onExit={onExit}
+            />
+          </div>
+        )}
+      </div>
 
       {/* iOS-Style Options & Filters Action Sheet */}
       <StudyOptionsSheet

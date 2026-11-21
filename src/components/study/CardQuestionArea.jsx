@@ -30,7 +30,7 @@ export default function CardQuestionArea({
           className={`${
             isCaseOrLong
               ? 'text-left text-base sm:text-lg md:text-xl font-semibold text-slate-900 leading-relaxed bg-slate-50/70 p-3.5 sm:p-4 rounded-2xl border border-slate-200/70 shadow-sm'
-              : 'text-center text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 leading-relaxed'
+              : 'text-center text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold text-slate-900 leading-relaxed'
           } whitespace-pre-line`}
         >
           {card.type === 'cloze'
@@ -73,14 +73,14 @@ export default function CardQuestionArea({
       )}
 
       {card.hint && card.hint.trim() && (
-        <div className="pt-1 pointer-events-auto">
+        <div className={`pt-2 pointer-events-auto ${isCaseOrLong ? 'text-left' : 'text-center'}`}>
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onToggleHint();
             }}
-            className="glass-pill px-3 py-1 rounded-full text-xs font-semibold text-amber-700 border-amber-200/80 inline-flex items-center gap-1"
+            className="glass-pill px-3.5 py-1.5 rounded-full text-xs font-semibold text-amber-700 hover:text-amber-900 border-amber-200/80 inline-flex items-center gap-1.5 shadow-xs transition active:scale-95"
           >
             <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
             <span>

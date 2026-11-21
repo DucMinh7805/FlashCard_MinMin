@@ -8,7 +8,6 @@ import SwipeStamps from './study/SwipeStamps';
 import CardAnswerArea from './study/CardAnswerArea';
 import CardQuestionArea from './study/CardQuestionArea';
 import CardStatusBadge from './study/CardStatusBadge';
-import StudyGestureHintBar from './study/StudyGestureHintBar';
 import { useStudyKeyboardShortcuts } from '../hooks/useStudyKeyboardShortcuts';
 
 export default function StudyView({
@@ -346,9 +345,6 @@ export default function StudyView({
           onUndo={onUndo}
           setOptionsOpen={setOptionsOpen}
         />
-
-        {/* Swipe Gesture & Tap Hint bar: Đồng nhất mặt trước & mặt sau */}
-        {!isComplete && card && <StudyGestureHintBar isFlipped={session.isFlipped} />}
 
         {/* Main Flashcard Card: Tràn đầy khoảng trống, chạm để lật và vuốt Swipe 4 hướng */}
         {!isComplete && card ? (

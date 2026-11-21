@@ -331,14 +331,14 @@ export default function DriveExplorer({
                 <select
                   value={folderSortMode}
                   onChange={(e) => handleFolderSortChange(e.target.value)}
-                  className="pl-6 pr-6 py-1 bg-white/80 hover:bg-white text-[11px] font-semibold text-slate-700 rounded-xl border border-slate-200/80 shadow-2xs appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-400"
+                  className="pl-6 pr-6 py-1 bg-white/80 hover:bg-white text-[11px] font-semibold text-slate-700 rounded-xl border border-slate-200/80 shadow-2xs appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-400 max-w-[160px] sm:max-w-none truncate"
                   title="Sắp xếp danh sách thư mục / môn học"
                 >
-                  <option value="name_asc">Tên A → Z (Tự nhiên 1→9)</option>
+                  <option value="name_asc">Tên A → Z (1→9)</option>
                   <option value="name_desc">Tên Z → A</option>
-                  <option value="newest">Mới cập nhật nhất</option>
+                  <option value="newest">Mới cập nhật</option>
                   <option value="oldest">Cũ nhất</option>
-                  <option value="due_desc">Cần ôn nhiều nhất</option>
+                  <option value="due_desc">Cần ôn nhiều</option>
                   <option value="cards_desc">Nhiều thẻ nhất</option>
                 </select>
                 <ChevronDown className="w-3 h-3 text-slate-400 absolute right-1.5 pointer-events-none" />
@@ -382,14 +382,14 @@ export default function DriveExplorer({
                 <select
                   value={deckSortMode}
                   onChange={(e) => handleDeckSortChange(e.target.value)}
-                  className="pl-6 pr-6 py-1 bg-white/80 hover:bg-white text-[11px] font-semibold text-slate-700 rounded-xl border border-slate-200/80 shadow-2xs appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-400"
+                  className="pl-6 pr-6 py-1 bg-white/80 hover:bg-white text-[11px] font-semibold text-slate-700 rounded-xl border border-slate-200/80 shadow-2xs appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-400 max-w-[160px] sm:max-w-none truncate"
                   title="Sắp xếp danh sách bài học"
                 >
-                  <option value="name_asc">Tên A → Z (Tự nhiên 1→9)</option>
+                  <option value="name_asc">Tên A → Z (1→9)</option>
                   <option value="name_desc">Tên Z → A</option>
-                  <option value="newest">Mới cập nhật nhất</option>
+                  <option value="newest">Mới cập nhật</option>
                   <option value="oldest">Cũ nhất</option>
-                  <option value="due_desc">Cần ôn nhiều nhất</option>
+                  <option value="due_desc">Cần ôn nhiều</option>
                   <option value="cards_desc">Nhiều thẻ nhất</option>
                 </select>
                 <ChevronDown className="w-3 h-3 text-slate-400 absolute right-1.5 pointer-events-none" />

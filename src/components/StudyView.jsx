@@ -70,6 +70,7 @@ export default function StudyView({
   const isComplete = session.currentIndex >= session.queue.length;
   const card = !isComplete ? session.queue[session.currentIndex] : null;
   const prog = card ? getCardProgress(progressMap, card.id) : null;
+  const repCount = prog?.reps ?? (prog?.lastReviewed ? Math.max(1, (prog.box || 0) + 1) : 0);
 
   useEffect(() => {
     if (rafRef.current) {
@@ -242,10 +243,10 @@ export default function StudyView({
     dragOffset.x > 40 ? 'green' : dragOffset.x < -40 ? 'red' : Math.abs(dragOffset.y) > 40 ? 'yellow' : null;
 
   return (
-    <section className="max-w-3xl mx-auto space-y-3 pb-4">
-      {/* Edge-to-Edge Sticky Header with integrated progress rim */}
-      <div className="sticky top-0 z-30 -mx-3 sm:mx-0 bg-white/95 backdrop-blur-xl border-b border-slate-200/90 sm:rounded-2xl sm:border sm:shadow-xs transition-all">
-        <div className="flex items-center justify-between px-3.5 py-2.5 sm:px-4 sm:py-3 gap-2">
+    <section className="w-full max-w-3xl mx-auto h-full flex-1 flex flex-col justify-between overflow-hidden select-none pb-0.5 sm:pb-2">
+      {/* Pinned Top Bar with integrated progress rim (Never scrolls off screen) */}
+      <div className="shrink-0 z-30 bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-2xl shadow-xs transition-all relative overflow-hidden mb-1 sm:mb-2">
+        <div className="flex items-center justify-between px-3 py-2 sm:px-4 sm:py-2.5 gap-2">
           {/* Back button */}
           <button
             type="button"
@@ -259,7 +260,7 @@ export default function StudyView({
 
           {/* Centered Title & Card Counter */}
           <div className="flex items-center gap-2 min-w-0 justify-center">
-            <h2 className="text-xs sm:text-sm font-bold text-slate-800 truncate max-w-[140px] sm:max-w-xs text-center">
+            <h2 className="text-xs sm:text-sm font-bold text-slate-800 truncate max-w-[150px] sm:max-w-xs text-center">
               {session.title}
             </h2>
             <span className="px-2 py-0.5 rounded-full bg-slate-100/90 text-slate-700 font-bold text-[11px] shrink-0 border border-slate-200/60">
@@ -314,7 +315,7 @@ export default function StudyView({
 
       {/* Swipe Gesture & Tap Hint bar */}
       {!isComplete && card && (
-        <div className="flex items-center justify-between px-2 text-[10px] sm:text-[11px] text-slate-500 font-medium select-none shrink-0 min-h-[20px]">
+        <div className="shrink-0 flex items-center justify-between px-2 text-[10px] sm:text-[11px] text-slate-500 font-medium select-none mb-1 sm:mb-2 min-h-[22px]">
           {session.isFlipped ? (
             <div className="w-full flex items-center justify-between text-[11px] font-semibold select-none">
               <span className="flex items-center gap-1 text-rose-600">
@@ -330,13 +331,16 @@ export default function StudyView({
           ) : (
             <div className="w-full text-center text-slate-500 font-medium flex items-center justify-center gap-1.5 text-xs animate-pulse">
               <span>👆</span>
-              <span>Chạm thẻ để xem đáp án • Phím Cách (Space)</span>
+              <span>
+                Chạm thẻ để xem đáp án
+                <span className="hidden sm:inline"> • Phím Cách (Space)</span>
+              </span>
             </div>
           )}
         </div>
       )}
 
-      {/* Main Flashcard Card */}
+      {/* Main Flashcard Card - Flex-1 stretches to fit mobile screen without blank gap */}
       {!isComplete && card ? (
         <div
           onClick={(e) => {
@@ -353,7 +357,7 @@ export default function StudyView({
             transition: isDragging ? 'none' : 'transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1)',
             touchAction: isContentScrollable() ? 'pan-y' : 'none',
           }}
-          className={`glass-card rounded-3xl p-5 sm:p-7 shadow-lg border border-white/95 min-h-[460px] sm:min-h-[500px] flex flex-col justify-between text-center cursor-pointer select-none relative overflow-hidden active:shadow-md transition-shadow ${
+          className={`glass-card rounded-3xl p-4 sm:p-7 shadow-lg border border-white/95 flex-1 min-h-0 flex flex-col justify-between text-center cursor-pointer select-none relative overflow-hidden active:shadow-md transition-shadow ${
             swipeIndicator === 'green'
               ? 'ring-4 ring-emerald-400/80 bg-emerald-50/40'
               : swipeIndicator === 'red'
@@ -364,7 +368,7 @@ export default function StudyView({
           }`}
         >
           {/* Top meta tags */}
-          <div className="flex items-center justify-between gap-2 text-xs">
+          <div className="shrink-0 flex items-center justify-between gap-2 text-xs mb-2">
             <span className="glass-pill px-3 py-1 rounded-full text-slate-600 font-semibold text-[11px] border border-slate-200/80">
               {card.type === 'cloze'
                 ? 'Điền vào chỗ trống'
@@ -373,23 +377,23 @@ export default function StudyView({
                 : 'Hỏi - Đáp thường'}
             </span>
             <div className="flex items-center gap-1.5">
-              {prog?.state === 'red' && (
+              {prog?.status === 'red' && (
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-sm" title="Chưa nhớ" />
               )}
-              {prog?.state === 'yellow' && (
+              {prog?.status === 'yellow' && (
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm" title="Tạm hiểu" />
               )}
-              {prog?.state === 'green' && (
+              {prog?.status === 'green' && (
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" title="Đã thuộc" />
               )}
               <span className="text-[11px] text-slate-500 font-medium">
-                {prog ? `Ôn ${prog.reps} lần` : 'Mới'}
+                {repCount > 0 ? `Ôn ${repCount} lần` : 'Thẻ mới'}
               </span>
             </div>
           </div>
 
           {/* Middle Body */}
-          <div ref={cardScrollRef} className="my-auto py-4 space-y-4 max-h-[60vh] overflow-y-auto no-drag">
+          <div ref={cardScrollRef} className="my-auto py-2 sm:py-4 space-y-3 sm:space-y-4 max-h-full overflow-y-auto no-drag">
             <p className="text-xs uppercase tracking-widest text-sky-800 font-bold">
               {useReverse ? 'Mặt sau • Câu hỏi ngược' : 'Mặt trước • Câu hỏi'}
             </p>
@@ -445,7 +449,15 @@ export default function StudyView({
                   className="glass-pill px-3 py-1 rounded-full text-xs font-semibold text-amber-700 border-amber-200/80 inline-flex items-center gap-1"
                 >
                   <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-                  <span>{session.hintVisible ? 'Ẩn gợi ý' : 'Gợi ý nhỏ (Phím H)'}</span>
+                  <span>
+                    {session.hintVisible ? (
+                      'Ẩn gợi ý'
+                    ) : (
+                      <span>
+                        Gợi ý nhỏ<span className="hidden sm:inline"> (Phím H)</span>
+                      </span>
+                    )}
+                  </span>
                 </button>
                 {session.hintVisible && (
                   <p className="mt-2 text-xs sm:text-sm text-amber-800 bg-amber-50/90 border border-amber-300/80 rounded-xl px-3.5 py-2 max-w-lg mx-auto shadow-sm">

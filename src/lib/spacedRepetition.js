@@ -53,6 +53,7 @@ export function calculateNextProgress(prevProg, rating) {
     box: nextBox,
     dueDate: nextDue,
     lastReviewed: now,
+    reps: (prevProg?.reps || 0) + 1,
   };
 }
 

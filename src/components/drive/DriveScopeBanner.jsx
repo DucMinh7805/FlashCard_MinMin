@@ -42,7 +42,7 @@ export default function DriveScopeBanner({
                 {greenPct}% đã thuộc
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 truncate mt-0.5">
+            <p className="text-[11px] text-slate-500 mt-0.5 leading-tight">
               {scopeStats.green}/{scopeStats.total} thẻ thuộc •{' '}
               {scopeStats.due > 0 ? (
                 <strong className="text-rose-600">{scopeStats.due} cần ôn hôm nay</strong>

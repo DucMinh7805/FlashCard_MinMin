@@ -23,9 +23,7 @@ export default function App() {
 
   // Listen for storage quota warnings
   useEffect(() => {
-    const handleQuotaErr = () => {
-      showToast('Bộ nhớ trình duyệt (LocalStorage) đầy! Hãy vào Cài đặt để sao lưu.');
-    };
+    const handleQuotaErr = () => showToast('Bộ nhớ trình duyệt (LocalStorage) đầy! Hãy vào Cài đặt để sao lưu.');
     window.addEventListener('minmin_quota_error', handleQuotaErr);
     return () => window.removeEventListener('minmin_quota_error', handleQuotaErr);
   }, [showToast]);
@@ -452,15 +450,10 @@ export default function App() {
       <AppModals
         importOpen={importOpen}
         setImportOpen={(open) => (open ? openImport() : closeAllModals())}
-        onConfirmImport={({ parsed, batchDecks, selectedFolderId, deckNameInput, deckNoteInput, author }) => {
+        onConfirmImport={(args) => {
           handleConfirmImport({
-            parsed,
-            batchDecks,
-            selectedFolderId,
-            deckNameInput,
-            deckNoteInput,
+            ...args,
             currentFolderId,
-            author,
             onComplete: (tFid) => {
               closeAllModals();
               handleSelectFolder(tFid);
@@ -505,9 +498,7 @@ export default function App() {
         onEditDeck={({ id, name, note }, openEditMode) => {
           if (openEditMode) {
             const deck = appData.decks.find((d) => d.id === id);
-            if (deck) {
-              openEditor('edit_deck', null, deck);
-            }
+            if (deck) openEditor('edit_deck', null, deck);
             return;
           }
           handleEditDeck({ id, name, note });

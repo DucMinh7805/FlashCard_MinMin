@@ -36,6 +36,9 @@ export default function StudyView({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [exitDirection, setExitDirection] = useState(null); // 'left' | 'right' | 'up' | 'down' | null
+  const exitDirectionRef = useRef(null);
+  exitDirectionRef.current = exitDirection;
+
   const dragStartRef = useRef({ x: 0, y: 0, time: 0 });
   const dragCurrentRef = useRef({ x: 0, y: 0 });
   const isPointerDownRef = useRef(false);
@@ -135,10 +138,6 @@ export default function StudyView({
     if (e.target.closest('button') || e.target.closest('a')) {
       return;
     }
-
-    try {
-      e.target.setPointerCapture?.(e.pointerId);
-    } catch (_) {}
 
     dragStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
     dragCurrentRef.current = { x: e.clientX, y: e.clientY };
@@ -254,6 +253,34 @@ export default function StudyView({
     hasMovedRef.current = false;
   };
 
+  // Global window listeners: Đảm bảo nhả chuột ở bất kỳ đâu ngoài thẻ cũng hồi vị trí, không bao giờ bị kẹt nghiêng
+  useEffect(() => {
+    const onWindowPointerMove = (e) => {
+      if (!isPointerDownRef.current || exitDirectionRef.current) return;
+      handlePointerMove(e);
+    };
+    const onWindowPointerUp = () => {
+      if (!isPointerDownRef.current) return;
+      endDrag();
+    };
+    const onWindowPointerCancel = () => {
+      if (!isPointerDownRef.current) return;
+      handlePointerCancel();
+    };
+
+    window.addEventListener('pointermove', onWindowPointerMove, { passive: true });
+    window.addEventListener('pointerup', onWindowPointerUp);
+    window.addEventListener('pointercancel', onWindowPointerCancel);
+    window.addEventListener('blur', onWindowPointerCancel);
+
+    return () => {
+      window.removeEventListener('pointermove', onWindowPointerMove);
+      window.removeEventListener('pointerup', onWindowPointerUp);
+      window.removeEventListener('pointercancel', onWindowPointerCancel);
+      window.removeEventListener('blur', onWindowPointerCancel);
+    };
+  }, []);
+
   const useReverse =
     session.direction === 'back_to_front' ||
     (session.direction === 'mixed' && card && (card.sortOrder || 0) % 2 === 1);
@@ -263,9 +290,9 @@ export default function StudyView({
       ? Math.min(100, Math.round(((session.currentIndex + 1) / session.queue.length) * 100))
       : 0;
 
-  const cardRotate = (dragOffset.x / 18).toFixed(2);
+  const cardRotate = Math.max(-25, Math.min(25, dragOffset.x / 16)).toFixed(2);
   const swipeIndicator =
-    dragOffset.x > 40 ? 'green' : dragOffset.x < -40 ? 'red' : Math.abs(dragOffset.y) > 40 ? 'yellow' : null;
+    dragOffset.x > 45 ? 'green' : dragOffset.x < -45 ? 'red' : Math.abs(dragOffset.y) > 45 ? 'yellow' : null;
 
   return (
     <section className="w-full max-w-3xl mx-auto h-full flex-1 flex flex-col justify-between overflow-hidden select-none pb-0.5 sm:pb-2">
@@ -311,14 +338,14 @@ export default function StudyView({
       {/* Main Flashcard Card - Flex-1 stretches to fit mobile screen without blank gap */}
       {!isComplete && card ? (
         <div
+          draggable={false}
+          onDragStart={(e) => e.preventDefault()}
           onClick={(e) => {
             if (e.target.closest('button') || e.target.closest('a')) return;
             if (wasSwipeRef.current) return;
             triggerFlip();
           }}
           onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerCancel}
           style={{
             transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) rotate(${cardRotate}deg)`,

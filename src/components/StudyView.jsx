@@ -1,14 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
-  ArrowLeft,
-  Undo2,
   Lightbulb,
   ImageOff,
   ZoomIn,
-  MoreHorizontal,
 } from 'lucide-react';
 import { computeStatsForCards, getCardProgress } from '../lib/spacedRepetition';
 import { formatClozeParts } from '../lib/clozeUtils';
+import StudyHeader from './study/StudyHeader';
 import StudyOptionsSheet from './study/StudyOptionsSheet';
 import StudyCompletionCard from './study/StudyCompletionCard';
 import ImageLightbox from './study/ImageLightbox';
@@ -93,15 +91,18 @@ export default function StudyView({
     }
     wasSwipeRef.current = true;
     setExitDirection(dir);
+    setIsDragging(false); // Cho phép CSS transition kích hoạt animation mượt mà
+
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       try {
-        navigator.vibrate(18);
+        navigator.vibrate(20);
       } catch (_) {}
     }
-    const targetX =
-      dir === 'right' ? window.innerWidth * 1.2 : dir === 'left' ? -window.innerWidth * 1.2 : 0;
-    const targetY =
-      dir === 'up' ? -window.innerHeight * 1.2 : dir === 'down' ? window.innerHeight * 1.2 : 0;
+
+    const flyX = typeof window !== 'undefined' ? window.innerWidth * 1.3 : 600;
+    const flyY = typeof window !== 'undefined' ? window.innerHeight * 1.3 : 800;
+    const targetX = dir === 'right' ? flyX : dir === 'left' ? -flyX : 0;
+    const targetY = dir === 'up' ? -flyY : dir === 'down' ? flyY : 0;
     setDragOffset({ x: targetX, y: targetY });
 
     setTimeout(() => {
@@ -117,23 +118,27 @@ export default function StudyView({
       hasMovedRef.current = false;
       setTimeout(() => {
         wasSwipeRef.current = false;
-      }, 250);
-    }, 180);
+      }, 150);
+    }, 220);
   };
 
   const handlePointerDown = (e) => {
     if (exitDirection) return;
 
-    // 1. Tránh xung đột mép trái iOS Safari / PWA Back gesture (< 28px hoặc > width - 20px)
+    // 1. Tránh xung đột mép vuốt thoát trang của iOS/Android
     const clientX = e.clientX ?? (e.touches ? e.touches[0].clientX : 0);
-    if (clientX < 28 || (typeof window !== 'undefined' && clientX > window.innerWidth - 20)) {
+    if (clientX < 16 || (typeof window !== 'undefined' && clientX > window.innerWidth - 16)) {
       return;
     }
 
-    // 2. Bỏ qua nếu người dùng ấn vào các nút con (Button xem Gợi ý, Phóng to ảnh...)
-    if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.no-drag')) {
+    // 2. Bỏ qua nếu người dùng bấm trúng các nút bấm con bên trong
+    if (e.target.closest('button') || e.target.closest('a')) {
       return;
     }
+
+    try {
+      e.target.setPointerCapture?.(e.pointerId);
+    } catch (_) {}
 
     dragStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
     dragCurrentRef.current = { x: e.clientX, y: e.clientY };
@@ -149,7 +154,8 @@ export default function StudyView({
 
     const scrollable = isContentScrollable();
 
-    if (scrollable && Math.abs(dy) > Math.abs(dx)) {
+    // Nếu nội dung thẻ dài cần cuộn và người dùng vuốt dọc nhiều, ưu tiên cuộn nội dung chữ
+    if (scrollable && Math.abs(dy) > Math.abs(dx) * 1.6 && Math.abs(dy) > 12) {
       if (isDragging) {
         setIsDragging(false);
         setDragOffset({ x: 0, y: 0 });
@@ -157,7 +163,7 @@ export default function StudyView({
       return;
     }
 
-    if (!hasMovedRef.current && (Math.abs(dx) > 8 || (!scrollable && Math.abs(dy) > 8))) {
+    if (!hasMovedRef.current && (Math.abs(dx) > 6 || (!scrollable && Math.abs(dy) > 6))) {
       hasMovedRef.current = true;
       setIsDragging(true);
       if (typeof window !== 'undefined' && window.getSelection) {
@@ -168,7 +174,7 @@ export default function StudyView({
     if (hasMovedRef.current) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() => {
-        setDragOffset({ x: dx, y: scrollable ? 0 : dy * 0.75 });
+        setDragOffset({ x: dx, y: scrollable ? dy * 0.35 : dy * 0.85 });
       });
     }
   };
@@ -185,17 +191,20 @@ export default function StudyView({
     const dx = dragCurrentRef.current.x - dragStartRef.current.x;
     const dy = dragCurrentRef.current.y - dragStartRef.current.y;
     const duration = Date.now() - dragStartRef.current.time;
-    const scrollable = isContentScrollable();
+    const dist = Math.hypot(dx, dy);
 
-    const isTap = !hasMovedRef.current && Math.abs(dx) < 30 && Math.abs(dy) < 30 && duration < 500;
+    // Chạm/Tap: Di chuyển < 18px và thời gian < 450ms -> lật mặt thẻ ngay lập tức
+    const isTap = dist < 18 && duration < 450;
 
     if (isTap) {
       setIsDragging(false);
       setDragOffset({ x: 0, y: 0 });
+      hasMovedRef.current = false;
       triggerFlip();
       return;
     }
 
+    // Nếu thẻ chưa lật, mọi vuốt ngang dọc đều mượt mà hồi về vị trí cũ
     if (!session.isFlipped) {
       setIsDragging(false);
       setDragOffset({ x: 0, y: 0 });
@@ -203,18 +212,34 @@ export default function StudyView({
       return;
     }
 
-    const THRESHOLD = 75;
-    if (dx > THRESHOLD) {
-      triggerSwipe('right', 'green');
-    } else if (dx < -THRESHOLD) {
-      triggerSwipe('left', 'red');
-    } else if (!scrollable && (dy < -THRESHOLD || dy > THRESHOLD)) {
-      triggerSwipe(dy < 0 ? 'up' : 'down', 'yellow');
+    // Khi đã lật: Vuốt 4 hướng để chấm điểm
+    const THRESHOLD = 60;
+    const scrollable = isContentScrollable();
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+      if (dx > THRESHOLD) {
+        triggerSwipe('right', 'green');
+        return;
+      } else if (dx < -THRESHOLD) {
+        triggerSwipe('left', 'red');
+        return;
+      }
     } else {
-      setIsDragging(false);
-      setDragOffset({ x: 0, y: 0 });
-      hasMovedRef.current = false;
+      if (!scrollable || Math.abs(dy) > 80) {
+        if (dy < -THRESHOLD) {
+          triggerSwipe('up', 'yellow');
+          return;
+        } else if (dy > THRESHOLD) {
+          triggerSwipe('down', 'yellow');
+          return;
+        }
+      }
     }
+
+    // Nếu chưa đủ ngưỡng, hồi về vị trí ban đầu với animation mượt
+    setIsDragging(false);
+    setDragOffset({ x: 0, y: 0 });
+    hasMovedRef.current = false;
   };
 
   const handlePointerUp = () => endDrag();
@@ -245,73 +270,16 @@ export default function StudyView({
   return (
     <section className="w-full max-w-3xl mx-auto h-full flex-1 flex flex-col justify-between overflow-hidden select-none pb-0.5 sm:pb-2">
       {/* Pinned Top Bar with integrated progress rim (Never scrolls off screen) */}
-      <div className="shrink-0 z-30 bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-2xl shadow-xs transition-all relative overflow-hidden mb-1 sm:mb-2">
-        <div className="flex items-center justify-between px-3 py-2 sm:px-4 sm:py-2.5 gap-2">
-          {/* Back button */}
-          <button
-            type="button"
-            onClick={onExit}
-            className="glass-pill px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 flex items-center gap-1 transition shrink-0 active:scale-95"
-            title="Quay lại danh sách bài học"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Quay lại</span>
-          </button>
-
-          {/* Centered Title & Card Counter */}
-          <div className="flex items-center gap-2 min-w-0 justify-center">
-            <h2 className="text-xs sm:text-sm font-bold text-slate-800 truncate max-w-[150px] sm:max-w-xs text-center">
-              {session.title}
-            </h2>
-            <span className="px-2 py-0.5 rounded-full bg-slate-100/90 text-slate-700 font-bold text-[11px] shrink-0 border border-slate-200/60">
-              {isComplete
-                ? `${session.queue.length} / ${session.queue.length}`
-                : `${session.currentIndex + 1} / ${session.queue.length}`}
-            </span>
-            <div className="hidden md:flex items-center gap-2 text-[11px] font-medium text-slate-500 border-l border-slate-200 pl-2">
-              <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" /> {st.red}
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" /> {st.yellow}
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> {st.green}
-              </span>
-            </div>
-          </div>
-
-          {/* Right actions: Undo + iOS Action Sheet Trigger (⋯) */}
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              disabled={undoCount === 0}
-              onClick={onUndo}
-              className="glass-pill w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 disabled:opacity-30 transition active:scale-95"
-              title="Hoàn tác thẻ vừa chấm (Z)"
-            >
-              <Undo2 className="w-3.5 h-3.5" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setOptionsOpen(true)}
-              className="glass-pill w-8 h-8 rounded-xl flex items-center justify-center text-slate-600 hover:text-slate-900 transition active:scale-95"
-              title="Tùy chọn học & Lọc thẻ"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* 3px edge-to-edge Progress Bar attached to the bottom rim */}
-        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-slate-200/80 overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-sky-400 via-indigo-500 to-emerald-400 transition-all duration-300"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-      </div>
+      <StudyHeader
+        session={session}
+        isComplete={isComplete}
+        pct={pct}
+        st={st}
+        undoCount={undoCount}
+        onExit={onExit}
+        onUndo={onUndo}
+        setOptionsOpen={setOptionsOpen}
+      />
 
       {/* Swipe Gesture & Tap Hint bar */}
       {!isComplete && card && (
@@ -344,7 +312,7 @@ export default function StudyView({
       {!isComplete && card ? (
         <div
           onClick={(e) => {
-            if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.no-drag')) return;
+            if (e.target.closest('button') || e.target.closest('a')) return;
             if (wasSwipeRef.current) return;
             triggerFlip();
           }}
@@ -354,7 +322,8 @@ export default function StudyView({
           onPointerCancel={handlePointerCancel}
           style={{
             transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) rotate(${cardRotate}deg)`,
-            transition: isDragging ? 'none' : 'transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1)',
+            transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.2, 0.9, 0.3, 1), opacity 0.22s ease-out',
+            opacity: exitDirection ? 0 : 1,
             touchAction: isContentScrollable() ? 'pan-y' : 'none',
           }}
           className={`glass-card rounded-3xl p-4 sm:p-7 shadow-lg border border-white/95 flex-1 min-h-0 flex flex-col justify-between text-center cursor-pointer select-none relative overflow-hidden active:shadow-md transition-shadow ${
@@ -393,7 +362,7 @@ export default function StudyView({
           </div>
 
           {/* Middle Body */}
-          <div ref={cardScrollRef} className="my-auto py-2 sm:py-4 space-y-3 sm:space-y-4 max-h-full overflow-y-auto no-drag">
+          <div ref={cardScrollRef} className="my-auto py-2 sm:py-4 space-y-3 sm:space-y-4 max-h-full overflow-y-auto">
             <p className="text-xs uppercase tracking-widest text-sky-800 font-bold">
               {useReverse ? 'Mặt sau • Câu hỏi ngược' : 'Mặt trước • Câu hỏi'}
             </p>

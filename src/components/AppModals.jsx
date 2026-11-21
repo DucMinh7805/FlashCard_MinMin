@@ -173,6 +173,8 @@ export default function AppModals({
         currentFolderId={currentFolderId}
         getFolderPath={getFolderPath}
         onConfirmImport={onConfirmImport}
+        settings={settings}
+        onUpdateSettings={onUpdateSettings}
       />
 
       <PromptModal isOpen={promptOpen} onClose={() => setPromptOpen(false)} />

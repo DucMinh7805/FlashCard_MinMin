@@ -1,33 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import {
-  X,
-  Database,
-  Lock,
-  Unlock,
-  RotateCcw,
-  Download,
-  Upload,
-  Copy,
-  Check,
-  Eye,
-  EyeOff,
-  AlertTriangle,
-  Server,
-  Layers,
-  FileCode,
-  HardDrive,
-  Camera,
-  Trash2,
-  Search,
-  CheckCircle2,
-  HelpCircle,
-} from 'lucide-react';
+import { X, Database, Lock } from 'lucide-react';
 import {
   getSystemSnapshots,
   createSystemSnapshot,
   deleteSystemSnapshot,
   calculateStorageSizeKB,
-  STORAGE_KEY_SNAPSHOTS,
 } from '../lib/systemVault';
 import {
   STORAGE_KEY_CONTENT,
@@ -35,6 +12,11 @@ import {
   safeSet,
 } from '../hooks/useMiniDrive';
 import { pushCloudData } from '../lib/supabase';
+import VaultPasscodeGate from './vault/VaultPasscodeGate';
+import VaultSnapshotList from './vault/VaultSnapshotList';
+import VaultRawPasteModal from './vault/VaultRawPasteModal';
+import VaultJsonViewerModal from './vault/VaultJsonViewerModal';
+import VaultConfirmDialog from './vault/VaultConfirmDialog';
 
 const VAULT_PASSCODE = '123456789';
 
@@ -49,8 +31,6 @@ export default function BackupVaultModal({
   showToast,
   onExportBackup,
   onRestoreBackup,
-  onExportUserProgress,
-  onRestoreUserProgress,
   onResetProgress,
 }) {
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -61,9 +41,7 @@ export default function BackupVaultModal({
 
   // Snapshots list
   const [snapshots, setSnapshots] = useState([]);
-  const [viewingJson, setViewingJson] = useState(null); // null | { title, jsonText }
-  const [jsonSearchQuery, setJsonSearchQuery] = useState('');
-  const [copiedJson, setCopiedJson] = useState(false);
+  const [viewingJson, setViewingJson] = useState(null);
 
   // Emergency Paste JSON Box
   const [showPasteBox, setShowPasteBox] = useState(false);
@@ -96,11 +74,10 @@ export default function BackupVaultModal({
       setPastedJson('');
       setConfirmDialog(null);
 
-      // Load existing snapshots or create initial if empty
       const existing = getSystemSnapshots();
-      if (existing.length === 0 && appData) {
-        const initSnap = createSystemSnapshot(appData, progressMap, 'Bản sao lưu hệ thống tự động');
-        setSnapshots(initSnap ? [initSnap] : []);
+      if (existing.length === 0 && appData?.folders?.length > 0) {
+        createSystemSnapshot(appData, progressMap, 'Khởi tạo hệ thống tự động');
+        setSnapshots(getSystemSnapshots());
       } else {
         setSnapshots(existing);
       }
@@ -108,23 +85,24 @@ export default function BackupVaultModal({
   }, [isOpen, appData, progressMap]);
 
   const handleUnlock = (e) => {
-    if (e) e.preventDefault();
+    e.preventDefault();
     if (enteredPasscode.trim() === VAULT_PASSCODE) {
       setIsUnlocked(true);
       setAuthError('');
+      setIsShaking(false);
       showToast('Đã mở khóa Kho dữ liệu Hệ thống!');
     } else {
-      setAuthError('Mật khẩu không chính xác! Vui lòng thử lại.');
       setIsShaking(true);
+      setAuthError('Mật khẩu không chính xác! Vui lòng thử lại.');
       setTimeout(() => setIsShaking(false), 500);
     }
   };
 
   const handleCreateNewSnapshot = () => {
-    const snap = createSystemSnapshot(appData, progressMap, 'Sao lưu thủ công tại chỗ');
+    const snap = createSystemSnapshot(appData, progressMap, 'Sao lưu thủ công');
     if (snap) {
       setSnapshots(getSystemSnapshots());
-      showToast('Đã tạo điểm sao lưu hệ thống mới thành công!');
+      showToast('Đã chụp điểm sao lưu mới vào bộ nhớ máy!');
     }
   };
 
@@ -184,7 +162,6 @@ export default function BackupVaultModal({
             setProgressMap(parsed.progressMap);
             safeSet(STORAGE_KEY_PROGRESS, parsed.progressMap);
           }
-          // Lưu lại điểm snapshot cứu hộ
           createSystemSnapshot(targetAppData, parsed.progressMap || progressMap, 'Nạp từ mã JSON sửa lỗi');
           setSnapshots(getSystemSnapshots());
           setShowPasteBox(false);
@@ -193,7 +170,7 @@ export default function BackupVaultModal({
           showToast('Đã nạp đè và sửa lỗi dữ liệu thành công!');
         },
       });
-    } catch (err) {
+    } catch {
       showToast('Lỗi cú pháp: Chuỗi dán vào không phải là JSON hợp lệ!');
     }
   };
@@ -254,517 +231,66 @@ export default function BackupVaultModal({
           </button>
         </div>
 
-        {/* 1. MÀN HÌNH KHÓA BẢO MẬT (Passcode Gate) */}
+        {/* 1. Màn hình khóa bảo mật */}
         {!isUnlocked ? (
-          <div className="p-5 sm:p-6 space-y-4 animate-fadeIn">
-            <div
-              className={`glass-card bg-slate-50/80 rounded-2xl p-5 border border-slate-200/90 text-center space-y-3.5 shadow-sm ${
-                isShaking ? 'shake-animation border-rose-300 bg-rose-50/40' : ''
-              }`}
-            >
-              <div className="w-14 h-14 rounded-3xl bg-gradient-to-tr from-indigo-500 to-sky-500 text-white mx-auto flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                <Lock className="w-7 h-7" />
-              </div>
-
-              <div>
-                <h4 className="text-sm sm:text-base font-bold text-slate-800">
-                  Kho dữ liệu hệ thống được khóa mã
-                </h4>
-                <p className="text-xs text-slate-500 max-w-xs mx-auto mt-1 leading-relaxed">
-                  Đây là kho lưu trữ dữ liệu gốc, các bản sao lưu cục bộ và công cụ sửa lỗi JSON của
-                  hệ thống. Vui lòng nhập mật khẩu quản trị để tiếp tục.
-                </p>
-              </div>
-
-              <form onSubmit={handleUnlock} className="space-y-3 max-w-xs mx-auto pt-1">
-                <div className="relative">
-                  <input
-                    type={showPasscode ? 'text' : 'password'}
-                    value={enteredPasscode}
-                    onChange={(e) => {
-                      setEnteredPasscode(e.target.value);
-                      if (authError) setAuthError('');
-                    }}
-                    autoFocus
-                    placeholder="Nhập mật khẩu (9 số)"
-                    className="w-full glass-input rounded-xl px-3.5 py-2.5 text-center text-sm font-mono tracking-widest text-slate-800 border-slate-300 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPasscode(!showPasscode)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    {showPasscode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-
-                {authError && (
-                  <p className="text-xs font-bold text-rose-600 animate-fadeIn">{authError}</p>
-                )}
-
-                <button
-                  type="submit"
-                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-500 hover:to-sky-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-indigo-600/25 transition active:scale-98 flex items-center justify-center gap-2"
-                >
-                  <Unlock className="w-4 h-4" />
-                  <span>Mở khóa Kho dữ liệu</span>
-                </button>
-              </form>
-
-              <div className="pt-2 border-t border-slate-200/60">
-                <p className="text-[11px] text-slate-400">
-                  Mật khẩu mặc định: <span className="font-mono font-bold text-slate-600">123456789</span>
-                </p>
-              </div>
-            </div>
-          </div>
+          <VaultPasscodeGate
+            enteredPasscode={enteredPasscode}
+            setEnteredPasscode={setEnteredPasscode}
+            showPasscode={showPasscode}
+            setShowPasscode={setShowPasscode}
+            isShaking={isShaking}
+            authError={authError}
+            setAuthError={setAuthError}
+            onUnlock={handleUnlock}
+          />
         ) : (
-          /* 2. MÀN HÌNH NỘI DUNG KHO DỮ LIỆU HỆ THỐNG */
+          /* 2. Màn hình nội dung kho dữ liệu */
           <div className="p-4 sm:p-5 overflow-y-auto space-y-3.5 animate-fadeIn">
-            {/* THẺ 1: DỮ LIỆU ĐANG LƯU Ở ĐÂU & TRẠNG THÁI HIỆN TẠI */}
-            <div className="glass-card bg-slate-50/70 rounded-2xl p-4 border border-slate-200/80 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
-                    <Server className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs sm:text-sm font-bold text-slate-800">
-                      Vị trí lưu trữ dữ liệu hệ thống
-                    </h4>
-                    <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
-                      Dữ liệu bài học được lưu tại 2 tầng bảo vệ:
-                    </p>
-                  </div>
-                </div>
+            <VaultSnapshotList
+              appData={appData}
+              totalCards={totalCards}
+              learnedCount={learnedCount}
+              storageSizeKB={storageSizeKB}
+              snapshots={snapshots}
+              onCreateNewSnapshot={handleCreateNewSnapshot}
+              onViewJson={setViewingJson}
+              onRestoreSnapshot={handleRestoreSnapshot}
+              onDeleteSnapshot={handleDeleteSnapshot}
+              showToast={showToast}
+            />
 
-                <button
-                  type="button"
-                  onClick={handleCreateNewSnapshot}
-                  className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-bold text-xs shadow-sm transition active:scale-95 flex items-center gap-1.5 shrink-0"
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                  <span>Chụp điểm lưu ngay</span>
-                </button>
-              </div>
-
-              {/* Chi tiết 2 nơi lưu */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
-                <div className="p-2.5 rounded-xl bg-white/80 border border-slate-200 space-y-0.5">
-                  <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <HardDrive className="w-3.5 h-3.5 text-sky-600" />
-                    1. Bộ nhớ máy (LocalStorage)
-                  </span>
-                  <p className="text-slate-500 leading-tight">
-                    Lưu tại khóa <code>minmin_flashcard_drive_v1</code>. Dù ngoại tuyến (offline) vẫn
-                    còn nguyên trên máy.
-                  </p>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-white/80 border border-slate-200 space-y-0.5">
-                  <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <Database className="w-3.5 h-3.5 text-emerald-600" />
-                    2. Đám mây Supabase Cloud
-                  </span>
-                  <p className="text-slate-500 leading-tight">
-                    Tự động đồng bộ ngầm thời gian thực (Atomic CRUD) lên bảng cơ sở dữ liệu của
-                    nhóm 10 người.
-                  </p>
-                </div>
-              </div>
-
-              {/* Thống kê số lượng hiện tại */}
-              <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-slate-200/60 text-xs">
-                <div className="flex items-center gap-3 text-slate-700 font-semibold">
-                  <span>{(appData?.folders || []).length} Thư mục</span>
-                  <span>•</span>
-                  <span>{(appData?.decks || []).length} Bài học</span>
-                  <span>•</span>
-                  <span>{totalCards} Thẻ</span>
-                  <span>•</span>
-                  <span className="text-indigo-600 font-bold">{learnedCount} Đã học</span>
-                </div>
-                <span className="text-[10px] text-slate-400 font-mono bg-slate-100 px-2 py-0.5 rounded-md">
-                  Dung lượng: ~{storageSizeKB} KB
-                </span>
-              </div>
-            </div>
-
-            {/* THẺ 2: CÁC MỐC SAO LƯU HỆ THỐNG (RESTORE POINTS) */}
-            <div className="glass-card bg-slate-50/70 rounded-2xl p-4 border border-slate-200/80 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <RotateCcw className="w-4 h-4 text-sky-600" />
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-800">
-                    Các mốc sao lưu hệ thống ({snapshots.length})
-                  </h4>
-                </div>
-                <span className="text-[10px] text-slate-400">
-                  Lưu trữ các điểm dữ liệu để khôi phục khi mất
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                {snapshots.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-3 text-center">
-                    Chưa có bản sao lưu nào. Hãy bấm "Chụp điểm lưu ngay" ở trên.
-                  </p>
-                ) : (
-                  snapshots.map((snap, idx) => (
-                    <div
-                      key={snap.id}
-                      className="p-3 rounded-xl bg-white border border-slate-200 hover:border-sky-300 transition space-y-2"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-xs font-bold text-slate-800">
-                              {snap.timeFormatted}
-                            </span>
-                            {idx === 0 && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 uppercase">
-                                Mới nhất
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-slate-500 mt-0.5">{snap.reason}</p>
-                          <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                            {snap.stats.folderCount} thư mục • {snap.stats.deckCount} bài •{' '}
-                            {snap.stats.cardCount} thẻ • {snap.stats.progressCount} tiến độ
-                          </p>
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setViewingJson({
-                                title: `Bản sao lưu: ${snap.timeFormatted}`,
-                                jsonText: JSON.stringify(snap.data, null, 2),
-                              })
-                            }
-                            title="Xem & Kiểm tra mã JSON"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
-                          >
-                            <FileCode className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteSnapshot(snap.id)}
-                            title="Xóa bản lưu này"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 pt-1.5 border-t border-slate-100">
-                        <button
-                          type="button"
-                          onClick={() => handleRestoreSnapshot(snap)}
-                          className="flex-1 py-1.5 px-3 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold text-xs border border-sky-200 transition active:scale-95 flex items-center justify-center gap-1.5"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Khôi phục dữ liệu bản này</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const blob = new Blob([JSON.stringify(snap.data, null, 2)], {
-                              type: 'application/json',
-                            });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = `MinMin_Snapshot_${snap.timeFormatted.replace(/[\/\s:]/g, '_')}.json`;
-                            a.click();
-                            URL.revokeObjectURL(url);
-                            showToast('Đã tải file snapshot về máy!');
-                          }}
-                          className="py-1.5 px-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1"
-                          title="Tải file snapshot về máy"
-                        >
-                          <Download className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Tải file</span>
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* THẺ 3: XUẤT / NẠP FILE & DÁN MÃ JSON SỬA LỖI KHẨN CẤP */}
-            <div className="glass-card bg-slate-50/70 rounded-2xl p-4 border border-slate-200/80 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-800">
-                    Cứu hộ & Sửa lỗi khẩn cấp (Emergency Fix)
-                  </h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Dùng khi bị mất bài hoặc cần nạp đè file/mã JSON cứu hộ từ máy khác:
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowPasteBox(!showPasteBox)}
-                  className="text-xs font-bold text-indigo-600 hover:underline shrink-0"
-                >
-                  {showPasteBox ? 'Đóng ô dán' : 'Dán mã JSON'}
-                </button>
-              </div>
-
-              {/* Ô dán JSON trực tiếp để fix */}
-              {showPasteBox && (
-                <div className="space-y-2 p-3 bg-white rounded-xl border-2 border-indigo-300 animate-fadeIn">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-800">
-                      Dán trực tiếp chuỗi JSON dữ liệu vào đây:
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setPastedJson('')}
-                      className="text-[10px] text-slate-400 hover:text-slate-600"
-                    >
-                      Xóa trắng
-                    </button>
-                  </div>
-                  <textarea
-                    rows={4}
-                    value={pastedJson}
-                    onChange={(e) => setPastedJson(e.target.value)}
-                    placeholder='{"appData": {"folders": [...], "decks": [...]}}'
-                    className="w-full glass-input rounded-xl p-2.5 text-xs font-mono text-slate-800"
-                  />
-                  <div className="flex items-center justify-end">
-                    <button
-                      type="button"
-                      onClick={handleApplyPastedJson}
-                      className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm transition active:scale-95 flex items-center gap-1.5"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Kiểm tra & Nạp đè dữ liệu sửa lỗi</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* 2 nút tải file và nạp file từ máy */}
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={onExportBackup}
-                  className="py-2.5 px-3 rounded-xl border border-emerald-200 hover:border-emerald-300 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition active:scale-95 shadow-sm"
-                >
-                  <Download className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span className="truncate">Tải file toàn bộ (.json)</span>
-                </button>
-
-                <label className="py-2.5 px-3 rounded-xl border border-teal-200 hover:border-teal-300 bg-white hover:bg-teal-50 text-slate-700 hover:text-teal-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition active:scale-95 shadow-sm cursor-pointer text-center">
-                  <Upload className="w-3.5 h-3.5 text-teal-600 shrink-0" />
-                  <span className="truncate">Nạp file cứu hộ (.json)</span>
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={onRestoreBackup}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-
-              {/* Nút xem trực tiếp raw JSON hiện tại */}
-              <div className="pt-1 border-t border-slate-200/60 flex items-center justify-between text-xs">
-                <span className="text-[11px] text-slate-500">
-                  Muốn xem toàn bộ chuỗi JSON đang chạy trên máy?
-                </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setViewingJson({
-                      title: 'Dữ liệu đang chạy hiện tại (Live System Data)',
-                      jsonText: JSON.stringify({ appData, progressMap }, null, 2),
-                    })
-                  }
-                  className="text-xs font-bold text-sky-600 hover:underline flex items-center gap-1"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Xem Raw JSON</span>
-                </button>
-              </div>
-              {/* Tùy chọn Quản trị: Đặt lại toàn bộ tiến độ học */}
-              {onResetProgress && (
-                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
-                  <div>
-                    <span className="block text-xs font-bold text-rose-800">Đặt lại toàn bộ tiến độ học</span>
-                    <span className="text-[10px] text-slate-500">Chuyển tất cả thẻ về trạng thái Chưa học (Hộp 1)</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setConfirmDialog({
-                        title: 'Đặt lại toàn bộ tiến độ học?',
-                        message: 'Tất cả thẻ sẽ được chuyển về Hộp 1 (Chưa học). Danh sách bài học và thẻ vẫn giữ nguyên.\n\nBạn có chắc chắn muốn thực hiện?',
-                        confirmText: 'Xác nhận đặt lại',
-                        action: () => {
-                          onResetProgress();
-                          setConfirmDialog(null);
-                        },
-                      });
-                    }}
-                    className="px-2.5 py-1 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition active:scale-95 shrink-0"
-                  >
-                    Đặt lại tiến độ
-                  </button>
-                </div>
-              )}
-            </div>
+            <VaultRawPasteModal
+              showPasteBox={showPasteBox}
+              setShowPasteBox={setShowPasteBox}
+              pastedJson={pastedJson}
+              setPastedJson={setPastedJson}
+              onApplyPastedJson={handleApplyPastedJson}
+              onExportBackup={onExportBackup}
+              onRestoreBackup={onRestoreBackup}
+              onViewRawLiveJson={() =>
+                setViewingJson({
+                  title: 'Dữ liệu đang chạy hiện tại (Live System Data)',
+                  jsonText: JSON.stringify({ appData, progressMap }, null, 2),
+                })
+              }
+              onResetProgress={onResetProgress}
+              setConfirmDialog={setConfirmDialog}
+            />
           </div>
         )}
 
-        {/* POPUP XEM & TÌM KIẾM MÃ RAW JSON */}
-        {viewingJson && (
-          <div className="absolute inset-0 z-30 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fadeIn">
-            <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden animate-scaleUp">
-              <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 bg-slate-50">
-                <div className="flex items-center gap-2 min-w-0">
-                  <FileCode className="w-4 h-4 text-indigo-600 shrink-0" />
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-800 truncate">
-                    {viewingJson.title}
-                  </h4>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setViewingJson(null)}
-                  className="glass-pill w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Search & Copy bar */}
-              <div className="p-3 bg-slate-100/80 border-b border-slate-200 flex items-center gap-2 shrink-0">
-                <div className="relative flex-1">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={jsonSearchQuery}
-                    onChange={(e) => setJsonSearchQuery(e.target.value)}
-                    placeholder="Tìm tên thẻ, bài học trong JSON..."
-                    className="w-full glass-input rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(viewingJson.jsonText);
-                    setCopiedJson(true);
-                    showToast('Đã copy toàn bộ mã JSON vào bộ nhớ tạm!');
-                    setTimeout(() => setCopiedJson(false), 2000);
-                  }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 shrink-0 ${
-                    copiedJson ? 'bg-emerald-500 text-white' : 'bg-white text-slate-700 border'
-                  }`}
-                >
-                  {copiedJson ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedJson ? 'Đã copy' : 'Copy JSON'}</span>
-                </button>
-              </div>
-
-              {/* Code viewer */}
-              <div className="p-3 overflow-y-auto flex-1 font-mono text-[11px] text-slate-800 bg-slate-900 text-slate-100 whitespace-pre leading-relaxed select-text">
-                {viewingJson.jsonText}
-              </div>
-              {/* Tùy chọn Quản trị: Đặt lại toàn bộ tiến độ học */}
-              {onResetProgress && (
-                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
-                  <div>
-                    <span className="block text-xs font-bold text-rose-800">Đặt lại toàn bộ tiến độ học</span>
-                    <span className="text-[10px] text-slate-500">Chuyển tất cả thẻ về trạng thái Chưa học (Hộp 1)</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setConfirmDialog({
-                        title: 'Đặt lại toàn bộ tiến độ học?',
-                        message: 'Tất cả thẻ sẽ được chuyển về Hộp 1 (Chưa học). Danh sách bài học và thẻ vẫn giữ nguyên.\n\nBạn có chắc chắn muốn thực hiện?',
-                        confirmText: 'Xác nhận đặt lại',
-                        action: () => {
-                          onResetProgress();
-                          setConfirmDialog(null);
-                        },
-                      });
-                    }}
-                    className="px-2.5 py-1 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition active:scale-95 shrink-0"
-                  >
-                    Đặt lại tiến độ
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Popup xem & tìm kiếm mã Raw JSON */}
+        <VaultJsonViewerModal
+          viewingJson={viewingJson}
+          onClose={() => setViewingJson(null)}
+          showToast={showToast}
+        />
 
         {/* Safety Confirmation Dialog */}
-        {confirmDialog && (
-          <div className="absolute inset-0 z-40 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-            <div className="bg-white rounded-2xl max-w-sm w-full p-4 space-y-3 shadow-2xl border border-slate-100 animate-scaleUp">
-              <div className="flex items-center gap-2.5 text-slate-800">
-                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-4 h-4" />
-                </div>
-                <h4 className="text-xs sm:text-sm font-bold">{confirmDialog.title}</h4>
-              </div>
-
-              <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line pl-1">
-                {confirmDialog.message}
-              </p>
-
-              <div className="flex items-center justify-end gap-2 pt-1.5">
-                <button
-                  type="button"
-                  onClick={() => setConfirmDialog(null)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 transition"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="button"
-                  onClick={confirmDialog.action}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 shadow-sm transition active:scale-95"
-                >
-                  {confirmDialog.confirmText}
-                </button>
-              </div>
-              {/* Tùy chọn Quản trị: Đặt lại toàn bộ tiến độ học */}
-              {onResetProgress && (
-                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
-                  <div>
-                    <span className="block text-xs font-bold text-rose-800">Đặt lại toàn bộ tiến độ học</span>
-                    <span className="text-[10px] text-slate-500">Chuyển tất cả thẻ về trạng thái Chưa học (Hộp 1)</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setConfirmDialog({
-                        title: 'Đặt lại toàn bộ tiến độ học?',
-                        message: 'Tất cả thẻ sẽ được chuyển về Hộp 1 (Chưa học). Danh sách bài học và thẻ vẫn giữ nguyên.\n\nBạn có chắc chắn muốn thực hiện?',
-                        confirmText: 'Xác nhận đặt lại',
-                        action: () => {
-                          onResetProgress();
-                          setConfirmDialog(null);
-                        },
-                      });
-                    }}
-                    className="px-2.5 py-1 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition active:scale-95 shrink-0"
-                  >
-                    Đặt lại tiến độ
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        <VaultConfirmDialog
+          confirmDialog={confirmDialog}
+          onCancel={() => setConfirmDialog(null)}
+        />
       </div>
     </div>
   );

@@ -322,12 +322,93 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
     showToast('Đã xóa thư mục và dữ liệu liên quan.');
   };
 
-  const handleConfirmImport = ({ parsed, selectedFolderId, deckNameInput, deckNoteInput, currentFolderId, onComplete }) => {
-    if (parsed.cards.length === 0) return showToast('Chưa có thẻ hợp lệ để nạp!');
-
+  const handleConfirmImport = ({
+    parsed,
+    batchDecks,
+    selectedFolderId,
+    deckNameInput,
+    deckNoteInput,
+    currentFolderId,
+    onComplete,
+    author: authorInput,
+  }) => {
     const targetFolderId = selectedFolderId !== undefined ? selectedFolderId : currentFolderId;
+    const author = (authorInput && authorInput.trim()) || settings.studentName || 'Thành viên';
+    const nowStr = new Date().toLocaleDateString('sv-SE');
+
+    // Luồng Nạp hàng loạt (Batch Multi-File Import)
+    if (Array.isArray(batchDecks) && batchDecks.length > 0) {
+      const validDecks = batchDecks.filter((d) => d && d.isValid && Array.isArray(d.cards) && d.cards.length > 0);
+      if (validDecks.length === 0) return showToast('Chưa có bài học hợp lệ nào để nạp!');
+
+      const nextDecks = appData.decks.map((d) => ({ ...d, cards: d.cards.slice() }));
+      let totalCardsCount = 0;
+      let newDecksCount = 0;
+      let mergedDecksCount = 0;
+      const decksToUpsert = [];
+
+      for (const item of validDecks) {
+        const deckName = (item.deckName || '').trim() || `Bài học ${nowStr}`;
+        const note = (item.note || '').trim();
+
+        const existing = nextDecks.find(
+          (d) => (d.folderId || null) === targetFolderId && d.name.toLowerCase() === deckName.toLowerCase()
+        );
+
+        let targetDeck;
+        if (existing) {
+          for (const nc of item.cards) {
+            const match = existing.cards.find((c) => c.front.trim().toLowerCase() === nc.front.trim().toLowerCase());
+            if (match) {
+              Object.assign(match, { back: nc.back, hint: nc.hint || match.hint, extra: nc.extra || match.extra, type: nc.type || match.type });
+            } else {
+              existing.cards.push(nc);
+            }
+          }
+          if (note) existing.note = note;
+          existing.author = author;
+          existing.updatedAt = nowStr;
+          targetDeck = existing;
+          mergedDecksCount++;
+        } else {
+          targetDeck = {
+            id: `deck_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            folderId: targetFolderId,
+            name: deckName,
+            note,
+            author,
+            createdAt: nowStr,
+            updatedAt: nowStr,
+            cards: item.cards,
+          };
+          nextDecks.push(targetDeck);
+          newDecksCount++;
+        }
+
+        totalCardsCount += item.cards.length;
+        decksToUpsert.push(targetDeck);
+      }
+
+      const nextData = { folders: appData.folders, decks: nextDecks };
+      setAppData(nextData);
+      safeSet(STORAGE_KEY_CONTENT, nextData);
+
+      for (const d of decksToUpsert) {
+        atomicUpsertDeckWithCards(settings.supabaseUrl, settings.supabaseKey, d, d.cards);
+      }
+
+      const msgParts = [];
+      if (newDecksCount > 0) msgParts.push(`tạo ${newDecksCount} bài mới`);
+      if (mergedDecksCount > 0) msgParts.push(`gộp ${mergedDecksCount} bài trùng tên`);
+      showToast(`Đã nạp thành công: ${msgParts.join(', ')} (${totalCardsCount} thẻ)!`);
+
+      if (onComplete) onComplete(targetFolderId);
+      return;
+    }
+
+    if (!parsed || parsed.cards.length === 0) return showToast('Chưa có thẻ hợp lệ để nạp!');
+
     const deckName = deckNameInput || `Bài học mới ${new Date().toLocaleDateString('vi-VN')}`;
-    const author = settings.studentName || 'Thành viên';
     const note = deckNoteInput !== undefined ? deckNoteInput : (parsed.note || '');
 
     const nextDecks = appData.decks.map((d) => ({ ...d, cards: d.cards.slice() }));
@@ -351,7 +432,8 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
       }
       if (note) existing.note = note;
       existing.author = author;
-      existing.updatedAt = new Date().toLocaleDateString('sv-SE');
+      existing.updatedAt = nowStr;
+      if (!existing.createdAt) existing.createdAt = nowStr;
       targetDeck = existing;
       showToast(`Đã gộp vào "${existing.name}": thêm ${added} thẻ, cập nhật ${updated} thẻ!`);
     } else {
@@ -361,7 +443,8 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
         name: deckName,
         note,
         author,
-        updatedAt: new Date().toLocaleDateString('sv-SE'),
+        createdAt: nowStr,
+        updatedAt: nowStr,
         cards: parsed.cards,
       };
       nextDecks.push(targetDeck);

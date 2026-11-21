@@ -1,6 +1,46 @@
 import React from 'react';
 import { BookOpen, X, User, Calendar, Clock, FileText, Edit3, FolderInput, Share2, Trash2 } from 'lucide-react';
 
+function formatDateTime(val, fallbackId = null) {
+  let dateObj = null;
+
+  if (val && typeof val === 'string') {
+    const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(val.trim());
+    if (isDateOnly && fallbackId) {
+      const idMatch = fallbackId.match(/^deck_(\d{10,13})/);
+      if (idMatch) {
+        const d = new Date(Number(idMatch[1]));
+        if (!isNaN(d.getTime())) dateObj = d;
+      }
+    }
+    if (!dateObj) {
+      const parsed = Date.parse(val);
+      if (!isNaN(parsed)) dateObj = new Date(parsed);
+    }
+  } else if (typeof val === 'number') {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) dateObj = d;
+  }
+
+  if (!dateObj && fallbackId) {
+    const idMatch = fallbackId.match(/^deck_(\d{10,13})/);
+    if (idMatch) {
+      const d = new Date(Number(idMatch[1]));
+      if (!isNaN(d.getTime())) dateObj = d;
+    }
+  }
+
+  if (!dateObj || isNaN(dateObj.getTime())) return val || 'Không rõ';
+
+  const hours = String(dateObj.getHours()).padStart(2, '0');
+  const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const year = dateObj.getFullYear();
+
+  return `${hours}:${minutes} • ${day}/${month}/${year}`;
+}
+
 export default function DeckActionSheet({
   openMenuDeckId,
   setOpenMenuDeckId,
@@ -15,22 +55,9 @@ export default function DeckActionSheet({
   const deck = appData.decks.find((d) => d.id === openMenuDeckId);
   if (!deck) return null;
 
-  // Format creation & update timestamps
-  let createdDateText = 'Không rõ';
-  if (deck.createdAt) {
-    createdDateText = deck.createdAt;
-  } else {
-    const match = deck.id?.match(/^deck_(\d{10,13})/);
-    if (match) {
-      const d = new Date(Number(match[1]));
-      if (!isNaN(d.getTime())) {
-        createdDateText = d.toLocaleDateString('vi-VN');
-      }
-    } else if (deck.updatedAt) {
-      createdDateText = deck.updatedAt;
-    }
-  }
-  const updatedDateText = deck.updatedAt || createdDateText;
+  // Format creation & update timestamps with exact hours, minutes, and dates
+  const createdDateText = formatDateTime(deck.createdAt, deck.id);
+  const updatedDateText = formatDateTime(deck.updatedAt || deck.createdAt, deck.id);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">

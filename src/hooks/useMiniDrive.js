@@ -334,7 +334,8 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
   }) => {
     const targetFolderId = selectedFolderId !== undefined ? selectedFolderId : currentFolderId;
     const author = (authorInput && authorInput.trim()) || settings.studentName || 'Thành viên';
-    const nowStr = new Date().toLocaleDateString('sv-SE');
+    const nowIso = new Date().toISOString();
+    const dateTitle = new Date().toLocaleDateString('vi-VN');
 
     // Luồng Nạp hàng loạt (Batch Multi-File Import)
     if (Array.isArray(batchDecks) && batchDecks.length > 0) {
@@ -348,7 +349,7 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
       const decksToUpsert = [];
 
       for (const item of validDecks) {
-        const deckName = (item.deckName || '').trim() || `Bài học ${nowStr}`;
+        const deckName = (item.deckName || '').trim() || `Bài học ${dateTitle}`;
         const note = (item.note || '').trim();
 
         const existing = nextDecks.find(
@@ -367,7 +368,7 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
           }
           if (note) existing.note = note;
           existing.author = author;
-          existing.updatedAt = nowStr;
+          existing.updatedAt = nowIso;
           targetDeck = existing;
           mergedDecksCount++;
         } else {
@@ -377,8 +378,8 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
             name: deckName,
             note,
             author,
-            createdAt: nowStr,
-            updatedAt: nowStr,
+            createdAt: nowIso,
+            updatedAt: nowIso,
             cards: item.cards,
           };
           nextDecks.push(targetDeck);
@@ -408,7 +409,7 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
 
     if (!parsed || parsed.cards.length === 0) return showToast('Chưa có thẻ hợp lệ để nạp!');
 
-    const deckName = deckNameInput || `Bài học mới ${new Date().toLocaleDateString('vi-VN')}`;
+    const deckName = deckNameInput || `Bài học mới ${dateTitle}`;
     const note = deckNoteInput !== undefined ? deckNoteInput : (parsed.note || '');
 
     const nextDecks = appData.decks.map((d) => ({ ...d, cards: d.cards.slice() }));
@@ -427,13 +428,12 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
           updated++;
         } else {
           existing.cards.push(nc);
-          added++;
         }
       }
       if (note) existing.note = note;
       existing.author = author;
-      existing.updatedAt = nowStr;
-      if (!existing.createdAt) existing.createdAt = nowStr;
+      existing.updatedAt = nowIso;
+      if (!existing.createdAt) existing.createdAt = nowIso;
       targetDeck = existing;
       showToast(`Đã gộp vào "${existing.name}": thêm ${added} thẻ, cập nhật ${updated} thẻ!`);
     } else {
@@ -443,8 +443,8 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
         name: deckName,
         note,
         author,
-        createdAt: nowStr,
-        updatedAt: nowStr,
+        createdAt: nowIso,
+        updatedAt: nowIso,
         cards: parsed.cards,
       };
       nextDecks.push(targetDeck);
@@ -467,7 +467,7 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
       ...deck,
       name: name || deck.name,
       note: note !== undefined ? note : deck.note,
-      updatedAt: new Date().toLocaleDateString('sv-SE'),
+      updatedAt: new Date().toISOString(),
     };
     const nextDecks = appData.decks.map((d) => (d.id === id ? updated : d));
     const nextData = { ...appData, decks: nextDecks };
@@ -480,7 +480,7 @@ export function useMiniDrive({ showToast, hasActiveSession }) {
   const handleMoveDeck = (deckId, newFolderId) => {
     const deck = appData.decks.find((d) => d.id === deckId);
     if (!deck) return;
-    const updated = { ...deck, folderId: newFolderId || null, updatedAt: new Date().toLocaleDateString('sv-SE') };
+    const updated = { ...deck, folderId: newFolderId || null, updatedAt: new Date().toISOString() };
     const nextDecks = appData.decks.map((d) => (d.id === deckId ? updated : d));
     const nextData = { ...appData, decks: nextDecks };
     setAppData(nextData);

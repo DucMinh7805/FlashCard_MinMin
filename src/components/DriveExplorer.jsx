@@ -73,7 +73,7 @@ export default function DriveExplorer({
   const childDecks = appData.decks.filter((d) => (d.folderId || null) === currentFolderId);
 
   // Sắp xếp danh sách bài học & thư mục (Natural Alphanumeric Sort)
-  const [sortMode, setSortMode] = useState(() => {
+  const [deckSortMode, setDeckSortMode] = useState(() => {
     try {
       return localStorage.getItem('minmin_deck_sort') || 'name_asc';
     } catch (_) {
@@ -81,45 +81,89 @@ export default function DriveExplorer({
     }
   });
 
-  const handleSortChange = (newMode) => {
-    setSortMode(newMode);
+  const [folderSortMode, setFolderSortMode] = useState(() => {
+    try {
+      return localStorage.getItem('minmin_folder_sort') || 'name_asc';
+    } catch (_) {
+      return 'name_asc';
+    }
+  });
+
+  const handleDeckSortChange = (newMode) => {
+    setDeckSortMode(newMode);
     try {
       localStorage.setItem('minmin_deck_sort', newMode);
+    } catch (_) {}
+  };
+
+  const handleFolderSortChange = (newMode) => {
+    setFolderSortMode(newMode);
+    try {
+      localStorage.setItem('minmin_folder_sort', newMode);
     } catch (_) {}
   };
 
   const sortedFolders = [...childFolders].sort((a, b) => {
     const nameA = (a.name || '').trim();
     const nameB = (b.name || '').trim();
-    return nameA.localeCompare(nameB, 'vi', { numeric: true, sensitivity: 'base' });
+
+    if (folderSortMode === 'name_asc') {
+      return nameA.localeCompare(nameB, 'vi', { numeric: true, sensitivity: 'base' });
+    }
+    if (folderSortMode === 'name_desc') {
+      return nameB.localeCompare(nameA, 'vi', { numeric: true, sensitivity: 'base' });
+    }
+    if (folderSortMode === 'newest') {
+      const timeA = a.updatedAt || a.id || '';
+      const timeB = b.updatedAt || b.id || '';
+      return timeB.localeCompare(timeA);
+    }
+    if (folderSortMode === 'oldest') {
+      const timeA = a.updatedAt || a.id || '';
+      const timeB = b.updatedAt || b.id || '';
+      return timeA.localeCompare(timeB);
+    }
+    if (folderSortMode === 'due_desc') {
+      const cardsA = getCardsByDeckIds(getFolderRecursiveDeckIds(a.id));
+      const cardsB = getCardsByDeckIds(getFolderRecursiveDeckIds(b.id));
+      const dueA = computeStatsForCards(cardsA, progressMap).due;
+      const dueB = computeStatsForCards(cardsB, progressMap).due;
+      return dueB - dueA;
+    }
+    if (folderSortMode === 'cards_desc') {
+      const countA = getCardsByDeckIds(getFolderRecursiveDeckIds(a.id)).length;
+      const countB = getCardsByDeckIds(getFolderRecursiveDeckIds(b.id)).length;
+      return countB - countA;
+    }
+    return 0;
   });
 
   const sortedDecks = [...childDecks].sort((a, b) => {
     const nameA = (a.name || '').trim();
     const nameB = (b.name || '').trim();
 
-    if (sortMode === 'name_asc') {
+    if (deckSortMode === 'name_asc') {
       return nameA.localeCompare(nameB, 'vi', { numeric: true, sensitivity: 'base' });
     }
-    if (sortMode === 'name_desc') {
+    if (deckSortMode === 'name_desc') {
       return nameB.localeCompare(nameA, 'vi', { numeric: true, sensitivity: 'base' });
     }
-    if (sortMode === 'newest') {
+    if (deckSortMode === 'newest') {
       const timeA = a.updatedAt || a.id || '';
       const timeB = b.updatedAt || b.id || '';
       return timeB.localeCompare(timeA);
     }
-    if (sortMode === 'oldest') {
+    if (deckSortMode === 'oldest') {
       const timeA = a.updatedAt || a.id || '';
       const timeB = b.updatedAt || b.id || '';
       return timeA.localeCompare(timeB);
     }
-    if (sortMode === 'due_desc') {
+    if (deckSortMode === 'due_desc') {
       const dueA = computeStatsForCards(a.cards, progressMap).due;
       const dueB = computeStatsForCards(b.cards, progressMap).due;
       return dueB - dueA;
     }
-    if (sortMode === 'cards_desc') {
+    if (deckSortMode === 'cards_desc') {
       return (b.cards?.length || 0) - (a.cards?.length || 0);
     }
     return 0;
@@ -277,11 +321,30 @@ export default function DriveExplorer({
       {/* Subfolders Grid */}
       {childFolders.length > 0 && (
         <div className="space-y-2">
-          <div className="flex items-center justify-between px-1">
+          <div className="flex items-center justify-between px-1 gap-2 flex-wrap">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Học phần / Môn học
             </h2>
-            <span className="text-xs text-slate-400 font-medium">{childFolders.length} thư mục</span>
+            <div className="flex items-center gap-2">
+              <div className="relative inline-flex items-center">
+                <ArrowUpDown className="w-3 h-3 text-slate-400 absolute left-2 pointer-events-none" />
+                <select
+                  value={folderSortMode}
+                  onChange={(e) => handleFolderSortChange(e.target.value)}
+                  className="pl-6 pr-6 py-1 bg-white/80 hover:bg-white text-[11px] font-semibold text-slate-700 rounded-xl border border-slate-200/80 shadow-2xs appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-400"
+                  title="Sắp xếp danh sách thư mục / môn học"
+                >
+                  <option value="name_asc">Tên A → Z (Tự nhiên 1→9)</option>
+                  <option value="name_desc">Tên Z → A</option>
+                  <option value="newest">Mới cập nhật nhất</option>
+                  <option value="oldest">Cũ nhất</option>
+                  <option value="due_desc">Cần ôn nhiều nhất</option>
+                  <option value="cards_desc">Nhiều thẻ nhất</option>
+                </select>
+                <ChevronDown className="w-3 h-3 text-slate-400 absolute right-1.5 pointer-events-none" />
+              </div>
+              <span className="text-xs text-slate-400 font-medium">{childFolders.length} thư mục</span>
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {sortedFolders.map((folder) => (
@@ -317,8 +380,8 @@ export default function DriveExplorer({
               <div className="relative inline-flex items-center">
                 <ArrowUpDown className="w-3 h-3 text-slate-400 absolute left-2 pointer-events-none" />
                 <select
-                  value={sortMode}
-                  onChange={(e) => handleSortChange(e.target.value)}
+                  value={deckSortMode}
+                  onChange={(e) => handleDeckSortChange(e.target.value)}
                   className="pl-6 pr-6 py-1 bg-white/80 hover:bg-white text-[11px] font-semibold text-slate-700 rounded-xl border border-slate-200/80 shadow-2xs appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-400"
                   title="Sắp xếp danh sách bài học"
                 >

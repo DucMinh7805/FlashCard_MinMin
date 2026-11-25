@@ -2,6 +2,8 @@ export const STORAGE_KEY_CONTENT = 'minmin_flashcard_drive_v1';
 export const STORAGE_KEY_PROGRESS = 'minmin_flashcard_progress_v1';
 export const STORAGE_KEY_SESSION = 'minmin_flashcard_active_session_v1';
 export const STORAGE_KEY_SETTINGS = 'minmin_flashcard_settings_v1';
+export const STORAGE_KEY_PROMPTS = 'minmin_flashcard_prompts_v1';
+export const STORAGE_KEY_ACTIVE_PROMPT = 'minmin_flashcard_active_prompt_v1';
 
 export function getDeviceId() {
   if (typeof window === 'undefined') return 'device_default';

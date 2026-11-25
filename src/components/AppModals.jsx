@@ -183,7 +183,7 @@ export default function AppModals({
         onUpdateSettings={onUpdateSettings}
       />
 
-      <PromptModal isOpen={promptOpen} onClose={() => setPromptOpen(false)} />
+      <PromptModal isOpen={promptOpen} onClose={() => setPromptOpen(false)} showToast={showToast} />
 
       <EditorModal
         isOpen={Boolean(editorMode)}
